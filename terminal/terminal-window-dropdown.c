@@ -813,9 +813,9 @@ terminal_window_dropdown_status_icon_popup_menu (GtkStatusIcon *status_icon,
   g_signal_connect (G_OBJECT (menu), "selection-done", G_CALLBACK (gtk_widget_destroy), NULL);
 
   xfce_gtk_menu_item_new_from_action_entry (terminal_window_get_action_entry (window, TERMINAL_WINDOW_ACTION_PREFERENCES), G_OBJECT (window), GTK_MENU_SHELL (menu));
-  xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
+  terminal_menu_append_separator (GTK_MENU_SHELL (menu));
   xfce_gtk_menu_item_new_from_action_entry (terminal_window_get_action_entry (window, TERMINAL_WINDOW_ACTION_CLOSE_WINDOW), G_OBJECT (window), GTK_MENU_SHELL (menu));
-  xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
+  terminal_menu_append_separator (GTK_MENU_SHELL (menu));
 
   gtk_widget_show_all (menu);
   gtk_menu_popup_at_pointer (GTK_MENU (menu), NULL);

@@ -59,6 +59,11 @@
 #define TERMINAL_SHARE_PROTOCOL_H
 
 #include <gio/gio.h>
+/* Explicit, not via gio.h: glib 2.72 on Ubuntu 22.04 does not include
+ * gunixsocketaddress.h from gio.h (glib 2.80 on 24.04 does), so without
+ * this the Jammy build fails with an implicit declaration of
+ * g_unix_socket_address_new, used by both the client and the server. */
+#include <gio/gunixsocketaddress.h>
 
 G_BEGIN_DECLS
 

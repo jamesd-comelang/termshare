@@ -110,6 +110,7 @@ executable(
   dependencies: [
     glib,
     gio,
+    gio_unix,
   ],
   install: true,
   install_dir: get_option('prefix') / get_option('bindir'),

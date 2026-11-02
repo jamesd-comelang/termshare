@@ -25,6 +25,13 @@ G_BEGIN_DECLS
 void
 terminal_util_show_about_dialog (GtkWindow *parent);
 
+/* Plain-GTK menu separator, replacing xfce_gtk_menu_append_separator
+ * (added in libxfce4ui 4.17.3, absent in Jammy's 4.16.1) so the binary
+ * does not link a 4.18-only symbol. Behaviour is identical: a visible
+ * separator line appended to the menu. */
+void
+terminal_menu_append_separator (GtkMenuShell *menu_shell);
+
 void
 terminal_util_activate_window (GtkWindow *window);
 

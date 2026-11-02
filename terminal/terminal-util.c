@@ -258,3 +258,11 @@ cleanup:
   return cwd;
 #endif
 }
+
+void
+terminal_menu_append_separator (GtkMenuShell *menu_shell)
+{
+  GtkWidget *separator = gtk_separator_menu_item_new ();
+  gtk_menu_shell_append (menu_shell, separator);
+  gtk_widget_show (separator);
+}

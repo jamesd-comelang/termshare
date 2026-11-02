@@ -22,7 +22,7 @@ dependency_versions = {
   'gtk': '>= 3.24.0',
   'vte': '>= 0.51.3',
   'pcre2': '>= 10.00',
-  'xfce4': '>= 4.18.0',
+  'xfce4': '>= 4.16.0',
   'libxfce4session-client': '>= 4.21.2',
 
   'libx11': '>= 1.6.7',
@@ -31,6 +31,7 @@ dependency_versions = {
 
 glib = dependency('glib-2.0', version: dependency_versions['glib'])
 gio = dependency('gio-2.0', version: dependency_versions['glib'])
+gio_unix = dependency('gio-unix-2.0', version: dependency_versions['glib'])
 gtk = dependency('gtk+-3.0', version: dependency_versions['gtk'])
 vte = dependency('vte-2.91', version: dependency_versions['vte'])
 pcre2 = dependency('libpcre2-8', version: dependency_versions['pcre2'])
