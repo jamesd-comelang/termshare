@@ -20,12 +20,13 @@
  * ordinary terminal emulator, using only character cells and ANSI
  * sequences. No GTK, no VTE.
  *
+ *   termshare-client
  *   termshare-client list
  *   termshare-client attach [window-id]
  *
- * With no window id, list mode output is printed and, if there is
- * exactly one window, it is attached; otherwise the user is asked to
- * pick one. In attach mode the client's own terminal is put in raw
+ * With no arguments, or with "attach" and no window id, the client
+ * prints the available sessions numbered 1, 2, 3, ... and waits for
+ * the user to pick a number before attaching. In attach mode the client's own terminal is put in raw
  * mode and switched to the alternate screen, so detaching restores
  * the caller's terminal exactly. Ctrl+] detaches. Everything else
  * typed is forwarded verbatim to the host tab, so arrows, Ctrl-C and
@@ -385,6 +386,111 @@ client_send_resize (Client *c)
   g_free (text);
 }
 
+
+/* Attach mode, after a LIST frame arrives: if a window id was given
+ * on the command line, attach to it; otherwise print the sessions
+ * numbered 1, 2, 3, ... (in list order, not by internal window id),
+ * wait for the user to pick a number in normal mode, and attach to
+ * the window behind that number. Returns after attaching or after
+ * quitting on a bad / missing pick. */
+static void
+client_pick_and_attach (Client *c, gchar **lines, gsize n_lines)
+{
+  GArray *ids = g_array_new (FALSE, FALSE, sizeof (guint));
+  gsize i;
+  guint window_number = 0;
+
+  for (i = 1; i < n_lines; i++)
+    {
+      if (g_str_has_prefix (lines[i], "WINDOW "))
+        {
+          guint id = (guint) atoi (lines[i] + 7);
+          g_array_append_val (ids, id);
+        }
+    }
+
+  if (ids->len == 0)
+    {
+      g_array_free (ids, TRUE);
+      client_quit (c, "No shared windows are available.", 1);
+      return;
+    }
+
+  if (c->target_set)
+    {
+      gboolean found = FALSE;
+      guint j;
+      for (j = 0; j < ids->len; j++)
+        if (g_array_index (ids, guint, j) == c->target_window_id)
+          found = TRUE;
+      g_array_free (ids, TRUE);
+      if (!found)
+        {
+          client_quit (c, "No such shared window.", 1);
+          return;
+        }
+      {
+        gchar *attach = g_strdup_printf ("ATTACH %u\n",
+                                         c->target_window_id);
+        client_enter_raw (c);
+        c->attached = TRUE;
+        terminal_share_frame_writer_queue_text (c->writer, attach);
+        g_free (attach);
+        client_send_resize (c);
+      }
+      return;
+    }
+
+  /* Numbered list: window lines get 1, 2, 3, ...; tab lines are
+   * shown indented under their window, as in list mode. */
+  for (i = 1; i < n_lines; i++)
+    {
+      gchar **f = g_strsplit (lines[i], "\t", -1);
+      if (g_str_has_prefix (lines[i], "WINDOW ") && f[1] != NULL)
+        {
+          window_number++;
+          g_print ("%u  %s\n", window_number, f[1]);
+        }
+      else if (g_str_has_prefix (lines[i], "TAB ") && f[3] != NULL)
+        {
+          g_print ("    %s%s\n", f[3],
+                   (g_strcmp0 (f[2], "1") == 0) ? " *" : "");
+        }
+      g_strfreev (f);
+    }
+
+  {
+    gchar buf[64];
+    guint choice = 0;
+    guint attach_id;
+    gchar *attach;
+
+    g_print ("Pick a session (1-%u): ", window_number);
+    fflush (stdout);
+    if (fgets (buf, sizeof (buf), stdin) == NULL)
+      {
+        g_array_free (ids, TRUE);
+        client_quit (c, "No session picked.", 1);
+        return;
+      }
+    choice = (guint) atoi (buf);
+    if (choice < 1 || choice > ids->len)
+      {
+        g_array_free (ids, TRUE);
+        client_quit (c, "No such session.", 1);
+        return;
+      }
+    attach_id = g_array_index (ids, guint, choice - 1);
+    g_array_free (ids, TRUE);
+    attach = g_strdup_printf ("ATTACH %u\n", attach_id);
+    client_enter_raw (c);
+    c->attached = TRUE;
+    terminal_share_frame_writer_queue_text (c->writer, attach);
+    g_free (attach);
+    client_send_resize (c);
+  }
+}
+
 static void
 client_frame_cb (const guint8 *data, gsize len, gpointer user_data)
 {
@@ -449,83 +555,7 @@ client_frame_cb (const guint8 *data, gsize len, gpointer user_data)
           return;
         }
 
-      /* Attach mode: choose a window from the list. */
-      {
-        GArray *ids = g_array_new (FALSE, FALSE, sizeof (guint));
-        gsize i;
-        for (i = 1; i < n_lines; i++)
-          {
-            if (g_str_has_prefix (lines[i], "WINDOW "))
-              {
-                guint id = (guint) atoi (lines[i] + 7);
-                g_array_append_val (ids, id);
-              }
-          }
-        if (ids->len == 0)
-          {
-            client_quit (c, "No shared windows are available.", 1);
-          }
-        else if (c->target_set)
-          {
-            gboolean found = FALSE;
-            guint j;
-            for (j = 0; j < ids->len; j++)
-              if (g_array_index (ids, guint, j) == c->target_window_id)
-                found = TRUE;
-            if (!found)
-              client_quit (c, "No such shared window.", 1);
-            else
-              {
-                gchar *attach = g_strdup_printf ("ATTACH %u\n",
-                                                 c->target_window_id);
-                client_enter_raw (c);
-                c->attached = TRUE;
-                terminal_share_frame_writer_queue_text (c->writer, attach);
-                g_free (attach);
-                client_send_resize (c);
-              }
-          }
-        else if (ids->len == 1)
-          {
-            gchar *attach = g_strdup_printf ("ATTACH %u\n",
-                                             g_array_index (ids, guint, 0));
-            client_enter_raw (c);
-            c->attached = TRUE;
-            terminal_share_frame_writer_queue_text (c->writer, attach);
-            g_free (attach);
-            client_send_resize (c);
-          }
-        else
-          {
-            /* Several windows: ask on the caller's terminal, in
-             * normal (non-raw) mode, before switching to raw. */
-            gchar buf[64];
-            guint choice = 0;
-            g_print ("Attach to window: ");
-            fflush (stdout);
-            if (fgets (buf, sizeof (buf), stdin) != NULL)
-              choice = (guint) atoi (buf);
-            {
-              gboolean found = FALSE;
-              guint j;
-              for (j = 0; j < ids->len; j++)
-                if (g_array_index (ids, guint, j) == choice)
-                  found = TRUE;
-              if (!found)
-                client_quit (c, "No such shared window.", 1);
-              else
-                {
-                  gchar *attach = g_strdup_printf ("ATTACH %u\n", choice);
-                  client_enter_raw (c);
-                  c->attached = TRUE;
-                  terminal_share_frame_writer_queue_text (c->writer, attach);
-                  g_free (attach);
-                  client_send_resize (c);
-                }
-            }
-          }
-        g_array_free (ids, TRUE);
-      }
+      client_pick_and_attach (c, lines, n_lines);
       g_strfreev (lines);
       return;
     }
@@ -722,13 +752,15 @@ main (int argc, char **argv)
   c.loop = g_main_loop_new (NULL, FALSE);
   c.exit_code = 0;
 
-  if (argc < 2 || (g_strcmp0 (argv[1], "list") != 0
-                   && g_strcmp0 (argv[1], "attach") != 0))
+  /* No arguments means: show the numbered session list and wait
+   * for the user to pick one (the same as "attach" with no id). */
+  if (argc >= 2 && g_strcmp0 (argv[1], "list") != 0
+      && g_strcmp0 (argv[1], "attach") != 0)
     {
-      g_printerr ("Usage: %s list | attach [window-id]\n", argv[0]);
+      g_printerr ("Usage: %s [list | attach [window-id]]\n", argv[0]);
       return 2;
     }
-  c.list_mode = (g_strcmp0 (argv[1], "list") == 0);
+  c.list_mode = (argc >= 2 && g_strcmp0 (argv[1], "list") == 0);
   if (!c.list_mode && argc >= 3)
     {
       c.target_window_id = (guint) atoi (argv[2]);

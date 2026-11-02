@@ -31,13 +31,18 @@ probe fails; a live server's socket is never unlinked.
 ## Client
 
 ```
+termshare-client
 termshare-client list
 termshare-client attach [window-id]
 ```
 
 `list` prints every window and its tabs, with `*` on the active tab.
-With no id, `attach` attaches to the only window, or asks which one
-to pick. The client renders the whole window:
+With no arguments, or with `attach` and no window id, the client
+prints the sessions numbered 1, 2, 3, ... (in list order, not by
+internal window id), waits for the user to pick a number, and
+attaches to that session. A bad number or EOF exits without
+attaching. `attach <window-id>` still takes an internal window id
+directly, as shown by `list`. The client renders the whole window:
 
 ```
  File  Edit  View  Terminal  Tabs  Help      (dim, display-only)
