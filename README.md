@@ -76,6 +76,24 @@ From release tarball:
     % meson compile -C build
     % meson install -C build
 
+### Release package (.deb)
+
+The .deb is the first release package format. Build it locally
+with the script in `packaging/` (same dependencies as above):
+
+    % packaging/build-deb.sh packaging/out
+
+That produces `packaging/out/termshare_<version>_<arch>.deb`,
+built from a meson install with prefix `/usr`, with runtime
+dependencies computed by `dpkg-shlibdeps`. Install it with:
+
+    % sudo dpkg -i packaging/out/termshare_*_*.deb
+
+The GitHub Actions workflow in `.github/workflows/package-deb.yml`
+("Package DEB") runs the same script on push, pull request, and
+manual dispatch, and uploads the .deb as the `termshare-deb`
+artifact.
+
 ### Uninstallation
 
     % sudo ninja uninstall -C build
