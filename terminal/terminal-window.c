@@ -2190,6 +2190,13 @@ terminal_window_get_context_menu (TerminalScreen *screen,
   xfce_gtk_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_OPEN_FOLDER), G_OBJECT (window), GTK_MENU_SHELL (context_menu));
   terminal_menu_append_separator (GTK_MENU_SHELL (context_menu));
 
+  /* Restored in termshare: upstream 1.x dropped these from the
+   * right-click menu (they survive only in the Terminal menu);
+   * 0.8.10 had Set Title here. Same actions, same popover/dialog. */
+  xfce_gtk_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SET_TITLE), G_OBJECT (window), GTK_MENU_SHELL (context_menu));
+  xfce_gtk_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SET_TITLE_COLOR), G_OBJECT (window), GTK_MENU_SHELL (context_menu));
+  terminal_menu_append_separator (GTK_MENU_SHELL (context_menu));
+
   terminal_window_menu_add_section (window, context_menu, MENU_SECTION_COPY | MENU_SECTION_PASTE, FALSE);
 
   xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SHOW_MENUBAR), G_OBJECT (window), gtk_widget_is_visible (window->menubar), GTK_MENU_SHELL (context_menu));
