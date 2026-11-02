@@ -17,8 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libxfce4kbd-private/xfce-shortcuts-editor.h>
-
+/* NOTE: do not re-add <libxfce4kbd-private/xfce-shortcuts-editor.h> here:
+ * it does not exist in Jammy's libxfce4kbd 4.16, and the only use of it
+ * (xfce_shortcuts_editor_new) is commented out above for the same reason.
+ * Re-adding it breaks the Jammy compile with "No such file or directory",
+ * even though the 24.04 build would still pass. */
 #include "terminal-encoding-action.h"
 #include "terminal-enum-types.h"
 #include "terminal-preferences-dialog.h"
