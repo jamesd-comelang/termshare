@@ -1478,9 +1478,15 @@ terminal_window_key_press_event (GtkWidget *widget,
                                  GdkEventKey *event)
 {
   TerminalWindow *window = TERMINAL_WINDOW (widget);
+  (void) window; /* unused now that the tab-accel call below is commented out */
 
-  if (xfce_gtk_handle_tab_accels (event, window->priv->accel_group, window, action_entries, G_N_ELEMENTS (action_entries)))
-    return TRUE;
+  /* Commented out for Ubuntu 22.04 compatibility: xfce_gtk_handle_tab_accels
+   * was added in libxfce4ui 4.17.3 and is absent in Jammy's 4.16.1, so a
+   * binary linking it fails at startup on 22.04. Without it, Tab-key
+   * shortcuts are not handled here; the parent handler below still passes
+   * Tab input through to the terminal, as pre-4.17 code did. */
+  /* if (xfce_gtk_handle_tab_accels (event, window->priv->accel_group, window, action_entries, G_N_ELEMENTS (action_entries)))
+    return TRUE; */
 
   return (*GTK_WIDGET_CLASS (terminal_window_parent_class)->key_press_event) (widget, event);
 }

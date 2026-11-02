@@ -1682,13 +1682,20 @@ terminal_preferences_dialog_init (TerminalPreferencesDialog *dialog)
   gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, TRUE, 0);
   gtk_widget_show (frame);
 
-  grid = xfce_shortcuts_editor_new (7, _("Window"),
+  /* Commented out for Ubuntu 22.04 compatibility: xfce_shortcuts_editor_new
+   * is absent in Jammy's libxfce4kbd 4.16, so a binary linking it fails at
+   * startup on 22.04. The Shortcuts page is therefore left empty in this
+   * build (the frame above stays, with no editor inside); all other
+   * preferences pages are unaffected. The add/show lines are commented
+   * out with the call, so the stale grid from the previous section is
+   * not reparented into this frame. */
+  /* grid = xfce_shortcuts_editor_new (7, _("Window"),
                                     terminal_window_get_action_entries (),
                                     (size_t) TERMINAL_WINDOW_ACTION_N, _("Terminal"),
                                     terminal_widget_get_action_entries (),
                                     (size_t) TERMINAL_WIDGET_ACTION_N);
   gtk_container_add (GTK_CONTAINER (frame), grid);
-  gtk_widget_show (grid);
+  gtk_widget_show (grid); */
 }
 
 
