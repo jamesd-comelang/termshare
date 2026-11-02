@@ -18,6 +18,10 @@ terminal_sources = [
   'terminal-search-dialog.h',
   'terminal-screen.c',
   'terminal-screen.h',
+  'terminal-share-protocol.c',
+  'terminal-share-protocol.h',
+  'terminal-share-server.c',
+  'terminal-share-server.h',
   'terminal-util.c',
   'terminal-util.h',
   'terminal-widget.c',
@@ -92,6 +96,20 @@ executable(
     libutempter,
     libprocstat,
     libutil,
+  ],
+  install: true,
+  install_dir: get_option('prefix') / get_option('bindir'),
+)
+
+# termshare-client: GTK-free, GLib/GIO only, renders a shared window
+# inside any ordinary terminal emulator.
+executable(
+  'termshare-client',
+  'terminal-share-client.c',
+  'terminal-share-protocol.c',
+  dependencies: [
+    glib,
+    gio,
   ],
   install: true,
   install_dir: get_option('prefix') / get_option('bindir'),

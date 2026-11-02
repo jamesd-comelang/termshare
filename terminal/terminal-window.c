@@ -47,6 +47,8 @@
 #include "terminal-window-dropdown.h"
 #include "terminal-window.h"
 
+#include "terminal-share-server.h"
+
 
 
 /* Signal identifiers */
@@ -240,6 +242,14 @@ terminal_window_action_fullscreen (TerminalWindow *window);
 static gboolean
 terminal_window_action_readonly (TerminalWindow *window);
 static gboolean
+terminal_window_action_share_toggle (TerminalWindow *window);
+static void
+terminal_window_share_update_indicator (TerminalWindow *window);
+static void
+terminal_window_share_state_changed_cb (GObject *object,
+                                        GParamSpec *pspec,
+                                        gpointer user_data);
+static gboolean
 terminal_window_action_scroll_on_output (TerminalWindow *window);
 static gboolean
 terminal_window_action_zoom_in (TerminalWindow *window);
@@ -372,6 +382,12 @@ struct _TerminalWindowPrivate
 
   /* if this is a TerminalWindowDropdown */
   guint drop_down : 1;
+
+  /* termshare indicator line above the tab bar */
+  GtkWidget *share_indicator;
+  GtkCssProvider *share_css_provider;
+  gulong share_sharing_handler;
+  gulong share_client_handler;
 };
 
 static guint window_signals[LAST_SIGNAL];
@@ -914,6 +930,16 @@ static XfceGtkActionEntry action_entries[] = {
     NULL,
     G_CALLBACK (terminal_window_action_scroll_on_output),
   },
+  {
+    TERMINAL_WINDOW_ACTION_SHARE_TERMINAL,
+    "<Actions>/terminal-window/share-terminal",
+    "",
+    XFCE_GTK_CHECK_MENU_ITEM,
+    N_ ("_Share Terminal"),
+    N_ ("Share this terminal with a remote client"),
+    NULL,
+    G_CALLBACK (terminal_window_action_share_toggle),
+  },
   /* used for changing the accelerator keys via the ShortcutsEditor, the logic is still handle by GtkActionEntries */
   {
     TERMINAL_WINDOW_ACTION_GOTO_TAB_1,
@@ -1190,8 +1216,36 @@ terminal_window_init (TerminalWindow *window)
 
   gtk_box_pack_start (GTK_BOX (window->priv->vbox), window->menubar, FALSE, FALSE, 0);
   gtk_box_pack_start (GTK_BOX (window->priv->vbox), window->toolbar, FALSE, FALSE, 0);
+  /* termshare indicator: a 2px line directly above the tab bar,
+   * hidden while sharing is off. */
+  window->priv->share_indicator = gtk_event_box_new ();
+  gtk_widget_set_size_request (window->priv->share_indicator, -1, 2);
+  gtk_style_context_add_class (
+      gtk_widget_get_style_context (window->priv->share_indicator),
+      "termshare-indicator");
+  window->priv->share_css_provider = gtk_css_provider_new ();
+  gtk_style_context_add_provider (
+      gtk_widget_get_style_context (window->priv->share_indicator),
+      GTK_STYLE_PROVIDER (window->priv->share_css_provider),
+      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  gtk_box_pack_start (GTK_BOX (window->priv->vbox),
+                      window->priv->share_indicator, FALSE, FALSE, 0);
   gtk_box_pack_start (GTK_BOX (window->priv->vbox), window->priv->notebook, TRUE, TRUE, 0);
   gtk_widget_show_all (window->priv->vbox);
+  /* The indicator was just shown by show_all; hide it again unless
+   * sharing is already on, and keep it in sync from now on. */
+  {
+    TerminalShareServer *share_server = terminal_share_server_get ();
+    window->priv->share_sharing_handler =
+        g_signal_connect (share_server, "notify::sharing",
+                          G_CALLBACK (terminal_window_share_state_changed_cb),
+                          window);
+    window->priv->share_client_handler =
+        g_signal_connect (share_server, "notify::client-connected",
+                          G_CALLBACK (terminal_window_share_state_changed_cb),
+                          window);
+    terminal_window_share_update_indicator (window);
+  }
 
   /* create encoding action */
   window->priv->encoding_action = terminal_encoding_action_new ("set-encoding", _("Set _Encoding"));
@@ -1249,6 +1303,18 @@ terminal_window_finalize (GObject *object)
       gtk_widget_destroy (window->priv->preferences_dialog);
     }
   g_object_unref (G_OBJECT (window->priv->preferences));
+  if (window->priv->share_sharing_handler != 0
+      || window->priv->share_client_handler != 0)
+    {
+      TerminalShareServer *share_server = terminal_share_server_get ();
+      if (window->priv->share_sharing_handler != 0)
+        g_signal_handler_disconnect (share_server,
+                                     window->priv->share_sharing_handler);
+      if (window->priv->share_client_handler != 0)
+        g_signal_handler_disconnect (share_server,
+                                     window->priv->share_client_handler);
+    }
+  g_clear_object (&window->priv->share_css_provider);
   g_object_unref (G_OBJECT (window->priv->accel_group));
   g_object_unref (G_OBJECT (window->priv->encoding_action));
 
@@ -2598,6 +2664,69 @@ terminal_window_action_fullscreen (TerminalWindow *window)
       else
         gtk_window_unfullscreen (GTK_WINDOW (window));
     }
+  return TRUE;
+}
+
+
+
+static void
+terminal_window_share_update_indicator (TerminalWindow *window)
+{
+  TerminalShareServer *server;
+  const gchar *color;
+  gchar *css;
+
+  if (window->priv->share_indicator == NULL)
+    return;
+  server = terminal_share_server_get ();
+  if (!terminal_share_server_is_sharing (server))
+    {
+      gtk_widget_hide (window->priv->share_indicator);
+      return;
+    }
+  /* Yellow = sharing on, no client; green = a client is connected. */
+  color = terminal_share_server_has_client (server) ? "#00c853" : "#ffc107";
+  css = g_strdup_printf (".termshare-indicator { background-color: %s; }",
+                         color);
+  gtk_css_provider_load_from_data (window->priv->share_css_provider,
+                                   css, -1, NULL);
+  g_free (css);
+  gtk_widget_show (window->priv->share_indicator);
+}
+
+
+
+static void
+terminal_window_share_state_changed_cb (GObject *object,
+                                        GParamSpec *pspec,
+                                        gpointer user_data)
+{
+  TerminalWindow *window = TERMINAL_WINDOW (user_data);
+  (void) object;
+  (void) pspec;
+  terminal_window_share_update_indicator (window);
+}
+
+
+
+static gboolean
+terminal_window_action_share_toggle (TerminalWindow *window)
+{
+  TerminalShareServer *server = terminal_share_server_get ();
+  GError *error = NULL;
+
+  if (terminal_share_server_is_sharing (server))
+    {
+      terminal_share_server_stop (server);
+    }
+  else if (!terminal_share_server_start (server, &error))
+    {
+      g_warning ("Unable to start terminal sharing: %s",
+                 error != NULL ? error->message : "unknown error");
+      g_clear_error (&error);
+      return FALSE;
+    }
+  terminal_window_share_update_indicator (window);
   return TRUE;
 }
 
@@ -3991,6 +4120,7 @@ terminal_window_update_terminal_menu (TerminalWindow *window,
   xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
   xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_READ_ONLY), G_OBJECT (window), !terminal_screen_get_input_enabled (window->priv->active), GTK_MENU_SHELL (menu));
   xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SCROLL_ON_OUTPUT), G_OBJECT (window), terminal_screen_get_scroll_on_output (window->priv->active), GTK_MENU_SHELL (menu));
+  xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SHARE_TERMINAL), G_OBJECT (window), terminal_share_server_is_sharing (terminal_share_server_get ()), GTK_MENU_SHELL (menu));
   xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
   xfce_gtk_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SAVE_CONTENTS), G_OBJECT (window), GTK_MENU_SHELL (menu));
   xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));

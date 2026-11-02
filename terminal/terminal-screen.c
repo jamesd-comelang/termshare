@@ -3189,6 +3189,129 @@ terminal_screen_feed_text (TerminalScreen *screen,
 
 
 
+void
+terminal_screen_feed_data (TerminalScreen *screen,
+                           const char *data,
+                           gsize len)
+{
+  g_return_if_fail (TERMINAL_IS_SCREEN (screen));
+  if (len > 0)
+    vte_terminal_feed_child (VTE_TERMINAL (screen->terminal), data,
+                             (gssize) len);
+}
+
+
+
+VteTerminal *
+terminal_screen_get_terminal (TerminalScreen *screen)
+{
+  g_return_val_if_fail (TERMINAL_IS_SCREEN (screen), NULL);
+  if (screen->terminal == NULL)
+    return NULL;
+  return VTE_TERMINAL (screen->terminal);
+}
+
+
+
+guint
+terminal_screen_get_session_id (TerminalScreen *screen)
+{
+  g_return_val_if_fail (TERMINAL_IS_SCREEN (screen), 0);
+  return screen->session_id;
+}
+
+
+
+gboolean
+terminal_screen_get_share_snapshot (TerminalScreen *screen,
+                                    glong *cols,
+                                    glong *rows,
+                                    glong *cursor_col,
+                                    glong *cursor_row,
+                                    gchar ***lines_out)
+{
+  VteTerminal *terminal;
+  glong n_cols, n_rows, col, abs_row, first_visible;
+  GtkAdjustment *adjustment;
+  gchar *text;
+  gchar **split;
+  glong i;
+
+  g_return_val_if_fail (TERMINAL_IS_SCREEN (screen), FALSE);
+  g_return_val_if_fail (lines_out != NULL, FALSE);
+
+  terminal = VTE_TERMINAL (screen->terminal);
+  if (terminal == NULL)
+    return FALSE;
+
+  n_cols = vte_terminal_get_column_count (terminal);
+  n_rows = vte_terminal_get_row_count (terminal);
+  if (n_cols < 1 || n_rows < 1)
+    return FALSE;
+
+  vte_terminal_get_cursor_position (terminal, &col, &abs_row);
+
+  /* The cursor row from VTE is absolute (scrollback included). The
+   * scrollable adjustment's value is the first visible row; this is
+   * the conversion the prototype relies on and must be verified
+   * against a real VTE build (see doc/termshare.md). */
+  first_visible = 0;
+  adjustment = gtk_scrollable_get_vadjustment (GTK_SCROLLABLE (terminal));
+  if (adjustment != NULL)
+    first_visible = (glong) gtk_adjustment_get_value (adjustment);
+  if (first_visible < 0)
+    first_visible = 0;
+  if (first_visible > abs_row)
+    first_visible = abs_row;
+
+  text = vte_terminal_get_text_include_trailing_spaces (terminal,
+                                                          NULL, NULL,
+                                                          NULL);
+  split = (text != NULL) ? g_strsplit (text, "\n", -1) : NULL;
+
+  *lines_out = g_new0 (gchar *, n_rows);
+  for (i = 0; i < n_rows; i++)
+    {
+      const gchar *line = (split != NULL && split[i] != NULL) ? split[i] : "";
+      /* get_text() separates rows with '\n'; a stray '\r' at the end
+       * of a row would otherwise corrupt the remote layout. */
+      gsize len = strlen (line);
+      if (len > 0 && line[len - 1] == '\r')
+        (*lines_out)[i] = g_strndup (line, len - 1);
+      else
+        (*lines_out)[i] = g_strdup (line);
+    }
+
+  g_strfreev (split);
+  g_free (text);
+
+  if (cols != NULL)
+    *cols = n_cols;
+  if (rows != NULL)
+    *rows = n_rows;
+  if (cursor_col != NULL)
+    *cursor_col = CLAMP (col, 0, n_cols - 1);
+  if (cursor_row != NULL)
+    *cursor_row = CLAMP (abs_row - first_visible, 0, n_rows - 1);
+  return TRUE;
+}
+
+
+
+void
+terminal_screen_share_snapshot_free (gchar **lines,
+                                     glong rows)
+{
+  glong i;
+  if (lines == NULL)
+    return;
+  for (i = 0; i < rows; i++)
+    g_free (lines[i]);
+  g_free (lines);
+}
+
+
+
 const gchar *
 terminal_screen_get_custom_fg_color (TerminalScreen *screen)
 {

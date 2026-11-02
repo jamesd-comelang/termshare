@@ -158,6 +158,36 @@ void
 terminal_screen_feed_text (TerminalScreen *screen,
                            const char *text);
 
+/* termshare: feed exactly len bytes (may contain NULs) to the child. */
+void
+terminal_screen_feed_data (TerminalScreen *screen,
+                           const char *data,
+                           gsize len);
+
+/* termshare: the VTE widget behind this screen, borrowed. */
+VteTerminal *
+terminal_screen_get_terminal (TerminalScreen *screen);
+
+/* termshare: the process-lifetime session id already assigned to this
+ * screen at creation time. */
+guint
+terminal_screen_get_session_id (TerminalScreen *screen);
+
+/* termshare: snapshot of the visible grid for remote rendering.
+ * On success, *lines_out holds exactly *rows strings (possibly
+ * empty), *cursor_row is a visible row, and the caller frees the
+ * array with terminal_screen_share_snapshot_free(). */
+gboolean
+terminal_screen_get_share_snapshot (TerminalScreen *screen,
+                                    glong *cols,
+                                    glong *rows,
+                                    glong *cursor_col,
+                                    glong *cursor_row,
+                                    gchar ***lines_out);
+void
+terminal_screen_share_snapshot_free (gchar **lines,
+                                     glong rows);
+
 const gchar *
 terminal_screen_get_custom_fg_color (TerminalScreen *screen);
 
