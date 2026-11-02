@@ -387,6 +387,78 @@ client_send_resize (Client *c)
 }
 
 
+/* Print one line per window: "<label>  <tab1>* | <tab2> | ...".
+ * The label is the sequential number when numbered is TRUE, else
+ * the window id from the WINDOW line. Tab titles are what the user
+ * recognises a session by, so the window title is not shown, except
+ * as a fallback for a window with no tabs at all. The active tab
+ * gets a trailing "*". */
+static void
+client_print_session_list (gchar **lines, gsize n_lines,
+                           gboolean numbered)
+{
+  guint number = 0;
+  guint window_id = 0;
+  gchar *window_title = NULL;
+  GString *tabs = NULL;
+  gsize i;
+
+  for (i = 1; i < n_lines; i++)
+    {
+      if (g_str_has_prefix (lines[i], "WINDOW "))
+        {
+          /* Flush the previous window. */
+          if (tabs != NULL)
+            {
+              {
+                gchar *label = g_strdup_printf ("%u", numbered ? number : window_id);
+                g_print ("%s  %s\n", label,
+                         tabs->len > 0 ? tabs->str
+                                       : (window_title != NULL ? window_title : ""));
+                g_free (label);
+              }
+              g_string_free (tabs, TRUE);
+              tabs = NULL;
+              g_free (window_title);
+              window_title = NULL;
+            }
+          number++;
+          window_id = (guint) atoi (lines[i] + 7);
+          {
+            gchar **f = g_strsplit (lines[i], "\t", -1);
+            window_title = g_strdup (f[1] != NULL ? f[1] : "");
+            g_strfreev (f);
+          }
+          tabs = g_string_new ("");
+        }
+      else if (g_str_has_prefix (lines[i], "TAB ") && tabs != NULL)
+        {
+          gchar **f = g_strsplit (lines[i], "\t", -1);
+          if (f[3] != NULL)
+            {
+              if (tabs->len > 0)
+                g_string_append (tabs, " | ");
+              g_string_append (tabs, f[3]);
+              if (g_strcmp0 (f[2], "1") == 0)
+                g_string_append_c (tabs, '*');
+            }
+          g_strfreev (f);
+        }
+    }
+  if (tabs != NULL)
+    {
+      {
+        gchar *label = g_strdup_printf ("%u", numbered ? number : window_id);
+        g_print ("%s  %s\n", label,
+                 tabs->len > 0 ? tabs->str
+                               : (window_title != NULL ? window_title : ""));
+        g_free (label);
+      }
+      g_string_free (tabs, TRUE);
+      g_free (window_title);
+    }
+}
+
 /* Attach mode, after a LIST frame arrives: if a window id was given
  * on the command line, attach to it; otherwise print the sessions
  * numbered 1, 2, 3, ... (in list order, not by internal window id),
@@ -441,23 +513,12 @@ client_pick_and_attach (Client *c, gchar **lines, gsize n_lines)
       return;
     }
 
-  /* Numbered list: window lines get 1, 2, 3, ...; tab lines are
-   * shown indented under their window, as in list mode. */
-  for (i = 1; i < n_lines; i++)
-    {
-      gchar **f = g_strsplit (lines[i], "\t", -1);
-      if (g_str_has_prefix (lines[i], "WINDOW ") && f[1] != NULL)
-        {
-          window_number++;
-          g_print ("%u  %s\n", window_number, f[1]);
-        }
-      else if (g_str_has_prefix (lines[i], "TAB ") && f[3] != NULL)
-        {
-          g_print ("    %s%s\n", f[3],
-                   (g_strcmp0 (f[2], "1") == 0) ? " *" : "");
-        }
-      g_strfreev (f);
-    }
+  /* Numbered list, one line per window, tab titles joined
+   * with " | ". window_number counts windows in list order, which
+   * is the same order the ids array above was built in, so picking
+   * number N maps to ids[N-1]. */
+  client_print_session_list (lines, n_lines, TRUE);
+  window_number = ids->len;
 
   {
     gchar buf[64];
@@ -536,20 +597,7 @@ client_frame_cb (const guint8 *data, gsize len, gpointer user_data)
     {
       if (c->list_mode)
         {
-          gsize i;
-          /* Print the server's list in a human form: WINDOW and TAB
-           * lines are tab-separated; the client prints them as
-           * "id  title" / "    tab title *". */
-          for (i = 1; i < n_lines; i++)
-            {
-              gchar **f = g_strsplit (lines[i], "\t", -1);
-              if (g_str_has_prefix (lines[i], "WINDOW ") && f[1] != NULL)
-                g_print ("%s  %s\n", f[0] + 7, f[1]);
-              else if (g_str_has_prefix (lines[i], "TAB ") && f[3] != NULL)
-                g_print ("    %s%s\n", f[3],
-                         (g_strcmp0 (f[2], "1") == 0) ? " *" : "");
-              g_strfreev (f);
-            }
+          client_print_session_list (lines, n_lines, FALSE);
           client_quit (c, NULL, 0);
           g_strfreev (lines);
           return;

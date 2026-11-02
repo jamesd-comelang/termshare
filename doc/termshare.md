@@ -36,13 +36,14 @@ termshare-client list
 termshare-client attach [window-id]
 ```
 
-`list` prints every window and its tabs, with `*` on the active tab.
-With no arguments, or with `attach` and no window id, the client
-prints the sessions numbered 1, 2, 3, ... (in list order, not by
-internal window id), waits for the user to pick a number, and
-attaches to that session. A bad number or EOF exits without
-attaching. `attach <window-id>` still takes an internal window id
-directly, as shown by `list`. The client renders the whole window:
+`list` prints one line per window, as its tab titles joined with
+` | `, with `*` on the active tab (for example, `1  vim: foo.c* |
+shell`). The window title itself is not shown, except as a fallback
+for a window with no tabs. With no arguments, or with `attach` and
+no window id, the client prints the same numbered list, waits for
+the user to pick a number, and attaches to that window. A bad number
+or EOF exits without attaching. `attach <window-id>` still takes an
+internal window id directly. The client renders the whole window:
 
 ```
  File  Edit  View  Terminal  Tabs  Help      (dim, display-only)
