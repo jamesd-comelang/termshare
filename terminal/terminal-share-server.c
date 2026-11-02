@@ -24,6 +24,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <glib/gstdio.h>
+
 
 
 struct _TerminalShareServer
