@@ -47,8 +47,8 @@
 #include "terminal-window-dropdown.h"
 #include "terminal-window.h"
 
-#define ACCEL_MAP_PATH "xfce4/terminal/accels.scm"
-#define TERMINAL_DESKTOP_FILE (DATADIR "/applications/xfce4-terminal.desktop")
+#define ACCEL_MAP_PATH "termshare/terminal/accels.scm"
+#define TERMINAL_DESKTOP_FILE (DATADIR "/applications/termshare.desktop")
 
 #ifdef HAVE_LIBXFCE4SESSION_CLIENT
 #include <libxfce4session-client/libxfce4session-client.h>

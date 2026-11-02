@@ -1,5 +1,5 @@
 project(
-  'xfce4-terminal',
+  'termshare',
   'c',
 version : '1.2.0-dev',
   license : 'GPL-2.0-or-later',
@@ -7,7 +7,6 @@ version : '1.2.0-dev',
   default_options : ['c_std=gnu11', 'buildtype=debugoptimized', 'warning_level=2']
 )
 
-project_namespace = 'apps'
 pkgdatadir = get_option('prefix') / get_option('datadir') / meson.project_name()
 copyright_year = '2026'
 terminal_version_dbus = '5'
@@ -184,7 +183,7 @@ extra_cflags += [
   '-DPACKAGE_DATADIR="@0@"'.format(pkgdatadir),
   '-DCOPYRIGHT_YEAR="@0@"'.format(copyright_year),
   '-DPACKAGE_LOCALE_DIR="@0@"'.format(get_option('prefix') / get_option('localedir')),
-  '-DPACKAGE_BUGREPORT="https://gitlab.xfce.org/@0@/@1@/-/issues"'.format(project_namespace, meson.project_name()),
+  '-DPACKAGE_BUGREPORT="https://github.com/jamesd-comelang/termshare/issues"',
   '-DGETTEXT_PACKAGE="@0@"'.format(meson.project_name()),
   '-DPREFIX="@0@"'.format(get_option('prefix')),
   '-DBINDIR="@0@"'.format(get_option('prefix') / get_option('bindir')),
@@ -196,24 +195,24 @@ extra_cflags += [
   '-DLOCALSTATEDIR="@0@"'.format(get_option('prefix') / get_option('localstatedir')),
   '-DSBINDIR="@0@"'.format(get_option('prefix') / get_option('sbindir')),
   '-DSYSCONFDIR="@0@"'.format(get_option('prefix') / get_option('sysconfdir')),
-  '-DHAVE_XFCE_REVISION_H=1',
+  '-DHAVE_TERMSHARE_REVISION_H=1',
 ]
 
 add_project_arguments(cc.get_supported_arguments(extra_cflags_check), language: 'c')
 add_project_arguments(extra_cflags, language: 'c')
 add_project_arguments(feature_cflags, language: 'c')
 
-xfce_revision_h = vcs_tag(
+termshare_revision_h = vcs_tag(
   command: ['git', 'rev-parse', '--short', 'HEAD'],
   fallback: 'UNKNOWN',
-  input: 'xfce-revision.h.in',
-  output: 'xfce-revision.h',
+  input: 'termshare-revision.h.in',
+  output: 'termshare-revision.h',
   replace_string: '@REVISION@',
 )
 
 desktop_files = [
-  'xfce4-terminal-settings.desktop.in',
-  'xfce4-terminal.desktop.in',
+  'termshare-settings.desktop.in',
+  'termshare.desktop.in',
 ]
 foreach file : desktop_files
   i18n.merge_file(

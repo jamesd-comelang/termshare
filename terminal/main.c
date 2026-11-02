@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef HAVE_XFCE_REVISION_H
-#include "xfce-revision.h"
+#ifdef HAVE_TERMSHARE_REVISION_H
+#include "termshare-revision.h"
 #endif
 
 #ifdef HAVE_SIGNAL_H
@@ -209,7 +209,7 @@ main (int argc, char **argv)
   if (setlocale (LC_ALL, "") == NULL)
     g_warning ("Locale not supported by C library.");
 
-  g_set_application_name (_("Xfce Terminal"));
+  g_set_application_name (_("Termshare"));
 
   /* gtk_init() will unset these, so read them early */
   if (WINDOWING_IS_WAYLAND ())
@@ -229,9 +229,9 @@ main (int argc, char **argv)
 
   if (G_UNLIKELY (options.show_version))
     {
-      g_print ("%s %s (Xfce %s)\n\n", PACKAGE_NAME, VERSION_FULL, xfce_version_string ());
+      g_print ("%s %s\n\n", PACKAGE_NAME, VERSION_FULL);
       g_print ("%s\n", "Copyright (c) 2003-" COPYRIGHT_YEAR);
-      g_print ("\t%s\n\n", _("The Xfce development team. All rights reserved."));
+      g_print ("\t%s\n\n", _("The Termshare development team. All rights reserved."));
       g_print ("%s\n", _("Written by Benedikt Meurer <benny@xfce.org>,"));
       g_print ("%s\n", _("Nick Schermer <nick@xfce.org>,"));
       g_print ("%s\n", _("Igor Zakharov <f2404@yandex.ru>,"));
@@ -344,7 +344,7 @@ main (int argc, char **argv)
     }
 
   /* set default window icon */
-  gtk_window_set_default_icon_name ("org.xfce.terminal");
+  gtk_window_set_default_icon_name ("org.termshare.terminal");
 
   app = g_object_new (TERMINAL_TYPE_APP, NULL);
 

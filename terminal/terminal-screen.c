@@ -3011,7 +3011,7 @@ terminal_screen_update_font (TerminalScreen *screen)
     }
   else if (font_use_system)
     {
-      /* read Xfce settings */
+      /* read settings */
       if (xfconf_init (NULL))
         {
           XfconfChannel *channel = xfconf_channel_get ("xsettings");

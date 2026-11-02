@@ -16,10 +16,10 @@
  */
 
 /*
- * termshare server, living inside the xfce4-terminal process.
+ * termshare server, living inside the termshare process.
  *
  * Sharing is off by default. terminal_share_server_start() creates
- * $XDG_RUNTIME_DIR/xfce4-terminal/share.sock (directory 0700, socket
+ * $XDG_RUNTIME_DIR/termshare/share.sock (directory 0700, socket
  * 0600, peer UID checked) and starts listening; stop() disconnects
  * any client with a BYE, removes the socket and stops listening.
  * The host's shells and PTYs are never touched: the server only reads

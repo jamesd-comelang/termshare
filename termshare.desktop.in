@@ -1,11 +1,11 @@
 [Desktop Entry]
 Version=1.0
-Name=Xfce Terminal
+Name=Termshare
 Comment=Terminal Emulator
 GenericName=Terminal Emulator
 Keywords=terminal;command line;prompt;cli;cmd;xterm;bash;shell;dos;
-Exec=xfce4-terminal
-Icon=org.xfce.terminal
+Exec=termshare
+Icon=org.termshare.terminal
 Terminal=false
 Type=Application
 Categories=GTK;System;TerminalEmulator;
@@ -14,4 +14,4 @@ Actions=preferences;
 
 [Desktop Action preferences]
 Name=Terminal Preferences
-Exec=xfce4-terminal --preferences
+Exec=termshare --preferences

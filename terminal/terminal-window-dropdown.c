@@ -643,7 +643,7 @@ terminal_window_dropdown_set_property (GObject *object,
     case PROP_DROPDOWN_STATUS_ICON:
       /*
        * FIXME: GtkStatusIcon is X11 only
-       * See also https://gitlab.xfce.org/apps/xfce4-terminal/-/issues/197
+       * See also https://github.com/jamesd-comelang/termshare/issues/197
        */
       if (!WINDOWING_IS_X11 ())
         return;
@@ -1284,7 +1284,7 @@ terminal_window_dropdown_new (const gchar *role,
 
   window = g_object_new (TERMINAL_TYPE_WINDOW_DROPDOWN,
                          "role", role,
-                         "icon-name", icon != NULL ? icon : "org.xfce.terminal",
+                         "icon-name", icon != NULL ? icon : "org.termshare.terminal",
                          NULL);
 
   /* read default preferences */

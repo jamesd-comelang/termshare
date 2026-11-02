@@ -901,7 +901,7 @@ terminal_share_server_start (TerminalShareServer *server,
   if (server->sharing)
     return TRUE;
 
-  dir = g_build_filename (g_get_user_runtime_dir (), "xfce4-terminal",
+  dir = g_build_filename (g_get_user_runtime_dir (), "termshare",
                           NULL);
   if (g_mkdir_with_parents (dir, 0700) != 0)
     {
@@ -915,7 +915,7 @@ terminal_share_server_start (TerminalShareServer *server,
   g_chmod (dir, 0700);
   g_free (server->socket_path);
   server->socket_path =
-      g_build_filename (g_get_user_runtime_dir (), "xfce4-terminal",
+      g_build_filename (g_get_user_runtime_dir (), "termshare",
                         "share.sock", NULL);
 
   if (g_file_test (server->socket_path, G_FILE_TEST_EXISTS))

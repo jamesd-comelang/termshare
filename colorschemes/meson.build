@@ -16,6 +16,6 @@ foreach file : preset_files
     po_dir: '..' / 'po',
     type: 'desktop',
     install: true,
-    install_dir: get_option('prefix') / get_option('datadir') / 'xfce4' / 'terminal' / 'colorschemes',
+    install_dir: get_option('prefix') / get_option('datadir') / 'termshare' / 'terminal' / 'colorschemes',
   )
 endforeach

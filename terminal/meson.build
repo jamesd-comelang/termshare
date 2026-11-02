@@ -70,11 +70,11 @@ terminal_sources += gnome.mkenums(
 )
 
 executable(
-  'xfce4-terminal',
+  'termshare',
   terminal_sources,
-  sources: xfce_revision_h,
+  sources: termshare_revision_h,
   c_args: [
-    '-DG_LOG_DOMAIN="@0@"'.format('xfce4-terminal'),
+    '-DG_LOG_DOMAIN="@0@"'.format('termshare'),
   ],
   include_directories: [
     include_directories('..'),

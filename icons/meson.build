@@ -1,7 +1,7 @@
 sizes = [16, 24, 32, 48, 64, 96, 128]
 names = [
-  'org.xfce.terminal-settings',
-  'org.xfce.terminal',
+  'org.termshare.terminal-settings',
+  'org.termshare.terminal',
 ]
 
 foreach name : names

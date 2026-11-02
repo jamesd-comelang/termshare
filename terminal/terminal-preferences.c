@@ -34,7 +34,7 @@
 #include "terminal-preferences.h"
 #include "terminal-private.h"
 
-#define TERMINALRC "xfce4/terminal/terminalrc"
+#define TERMINALRC "termshare/terminal/terminalrc"
 #define TERMINALRC_OLD "Terminal/terminalrc"
 
 
@@ -1298,10 +1298,10 @@ terminal_preferences_init (TerminalPreferences *preferences)
     }
 
   /* load the channel */
-  preferences->channel = xfconf_channel_get ("xfce4-terminal");
+  preferences->channel = xfconf_channel_get ("termshare");
 
   channels = xfconf_list_channels ();
-  if (channels != NULL && !g_strv_contains ((const gchar *const *) channels, "xfce4-terminal"))
+  if (channels != NULL && !g_strv_contains ((const gchar *const *) channels, "termshare"))
     {
       /* try to load the old config file & save changes */
       terminal_preferences_load_rc_file (preferences);

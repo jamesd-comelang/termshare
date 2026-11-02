@@ -221,7 +221,7 @@ terminal_preferences_dialog_init (TerminalPreferencesDialog *dialog)
   dialog->preferences = terminal_preferences_get ();
 
   /* configure the dialog properties */
-  gtk_window_set_icon_name (GTK_WINDOW (dialog), "org.xfce.terminal");
+  gtk_window_set_icon_name (GTK_WINDOW (dialog), "org.termshare.terminal");
   gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
   gtk_window_set_title (GTK_WINDOW (dialog), _("Terminal Preferences"));
 
@@ -557,7 +557,7 @@ terminal_preferences_dialog_init (TerminalPreferencesDialog *dialog)
   g_object_bind_property (G_OBJECT (dialog->preferences), "dropdown-toggle-focus",
                           G_OBJECT (button), "active",
                           G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
-  gtk_widget_set_tooltip_text (button, _("If enabled, the app shortcut for 'xfce4-terminal --drop-down',"
+  gtk_widget_set_tooltip_text (button, _("If enabled, the app shortcut for 'termshare --drop-down',"
                                          " which normally opens and closes the window, will give it focus"
                                          " if the option to keep the window open is checked."));
   gtk_grid_attach (GTK_GRID (grid), button, 0, row, 1, 1);
@@ -2039,8 +2039,8 @@ terminal_preferences_dialog_presets_load (TerminalPreferencesDialog *dialog,
   combobox = GTK_COMBO_BOX (widget);
 
   /* load schemes */
-  global = xfce_resource_match (XFCE_RESOURCE_DATA, "xfce4/terminal/colorschemes/*", TRUE);
-  user = xfce_resource_match (XFCE_RESOURCE_CONFIG, "xfce4/terminal/colorschemes/*", TRUE);
+  global = xfce_resource_match (XFCE_RESOURCE_DATA, "termshare/terminal/colorschemes/*", TRUE);
+  user = xfce_resource_match (XFCE_RESOURCE_CONFIG, "termshare/terminal/colorschemes/*", TRUE);
   n_global = g_strv_length (global);
   n_user = g_strv_length (user);
   presets = g_new0 (gchar *, n_global + n_user);
@@ -2264,7 +2264,7 @@ terminal_preferences_dialog_response (GtkDialog *dialog,
   if (G_UNLIKELY (response == GTK_RESPONSE_HELP))
     {
       /* open the preferences section of the user manual */
-      xfce_dialog_show_help (GTK_WINDOW (dialog), "xfce4-terminal", "preferences", NULL);
+      xfce_dialog_show_help (GTK_WINDOW (dialog), "termshare", "preferences", NULL);
     }
   else
     {

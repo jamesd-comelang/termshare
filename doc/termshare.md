@@ -1,16 +1,16 @@
 # termshare: remote terminal session sharing (prototype)
 
-Share a running xfce4-terminal window inside another ordinary terminal
+Share a running termshare window inside another ordinary terminal
 emulator, using only character cells and ANSI sequences. No new
 process is spawned for the shared session, no shell is restarted, and
-no PTY is touched: the server lives inside the xfce4-terminal process,
+no PTY is touched: the server lives inside the termshare process,
 reads VTE's visible grid, and feeds input bytes back through VTE.
 
 ## Host: turning sharing on and off
 
 Sharing is off by default, and off again on every launch (it is not
 persisted). In the host window, Terminal menu -> **Share Terminal**
-toggles it for the whole xfce4-terminal process.
+toggles it for the whole termshare process.
 
 - Off: no socket exists, and a client gets a clear "sharing is off"
   message instead of a connection error.
@@ -21,7 +21,7 @@ toggles it for the whole xfce4-terminal process.
   Sharing stopped`, the socket file is removed, and the host's shells
   are untouched.
 
-The socket is `$XDG_RUNTIME_DIR/xfce4-terminal/share.sock`. The
+The socket is `$XDG_RUNTIME_DIR/termshare/share.sock`. The
 directory is created (or tightened) to 0700 and the socket to 0600,
 and the server also checks the peer's UID against its own, so only
 the current user can connect even if the permissions were widened.
@@ -108,16 +108,16 @@ signals the host PTY.
   the scrollable adjustment's value as the first visible row. That
   conversion, and the exact `get_text` behaviour for soft-wrapped
   lines and the alternate screen, must be checked against a real
-  xfce4-terminal build before this is called working.
+  termshare build before this is called working.
 - **Build status:** `termshare-client` plus the shared protocol code
   compile cleanly with `-Wall -Wextra` and were tested against a
   mock server (list, attach, SYNC, row UPDATE, RESIZE, Ctrl+]
-  detach). The host side (`xfce4-terminal` itself, GTK/VTE) could
+  detach). The host side (`termshare` itself, GTK/VTE) could
   not be built in the development VM used for this prototype, which
   has no GTK/VTE development packages, so the server, screen
   snapshot, window indicator and toggle have been code-reviewed
   but not compiled or run end to end. That is the first thing to
-  verify on a machine with the xfce4-terminal build dependencies.
+  verify on a machine with the termshare build dependencies.
 - Tab bars longer than the grid width, and grid rows containing
   very wide characters, may wrap in the remote terminal; both are
   accepted prototype limitations.

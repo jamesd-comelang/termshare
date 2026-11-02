@@ -418,7 +418,7 @@ terminal_widget_context_menu_copy (TerminalWidget *widget,
         }
 
       // The order of setting the clipboard does matter, see:
-      // https://gitlab.xfce.org/apps/xfce4-terminal/-/issues/367
+      // https://github.com/jamesd-comelang/termshare/issues/367
 
       /* copy the URI to "PRIMARY" */
       clipboard = gtk_clipboard_get_for_display (display, GDK_SELECTION_PRIMARY);
@@ -986,7 +986,7 @@ terminal_widget_update_highlight_urls (TerminalWidget *widget)
  * with a key type that also uses Shift, ISO_Level5_Shift + e producing Up
  * activates <Shift>Up. Check the actual modifier state, and let the key fall
  * through to VTE otherwise. See
- * https://gitlab.xfce.org/apps/xfce4-terminal/-/issues/261 */
+ * https://github.com/jamesd-comelang/termshare/issues/261 */
 static gboolean
 terminal_widget_action_mods_held (TerminalWidget *widget,
                                   TerminalWidgetAction action)

@@ -16,7 +16,7 @@
  */
 
 /*
- * termshare-client: render a shared xfce4-terminal window inside any
+ * termshare-client: render a shared termshare window inside any
  * ordinary terminal emulator, using only character cells and ANSI
  * sequences. No GTK, no VTE.
  *
@@ -829,7 +829,7 @@ main (int argc, char **argv)
     }
 
   socket_path = g_build_filename (g_get_user_runtime_dir (),
-                                  "xfce4-terminal", "share.sock", NULL);
+                                  "termshare", "share.sock", NULL);
   if (!g_file_test (socket_path, G_FILE_TEST_EXISTS))
     {
       g_printerr ("termshare-client: sharing is off on the host "

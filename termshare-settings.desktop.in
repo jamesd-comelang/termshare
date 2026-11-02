@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Termshare Settings
+Comment=Configure Termshare
+Keywords=terminal;settings;preferences;configuration;configure;
+Exec=termshare --preferences
+Icon=org.termshare.terminal-settings
+Terminal=false
+Type=Application
+Categories=GTK;Settings;DesktopSettings;X-Termshare-SettingsDialog;X-Termshare-PersonalSettings;
+StartupNotify=true
+NoDisplay=true
+NotShowIn=GNOME;

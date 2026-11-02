@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef HAVE_XFCE_REVISION_H
-#include "xfce-revision.h"
+#ifdef HAVE_TERMSHARE_REVISION_H
+#include "termshare-revision.h"
 #endif
 
 #ifdef HAVE_STDARG_H
@@ -88,16 +88,16 @@ terminal_util_show_about_dialog (GtkWindow *parent)
   gtk_show_about_dialog (parent,
                          "authors", authors,
                          "artists", artists,
-                         "comments", _("Xfce Terminal Emulator"),
+                         "comments", _("Termshare Emulator"),
                          "documenters", documenters,
-                         "copyright", "Copyright \302\251 2003-" COPYRIGHT_YEAR " The Xfce development team",
+                         "copyright", "Copyright \302\251 2003-" COPYRIGHT_YEAR " The Termshare development team",
                          "license", XFCE_LICENSE_GPL,
-                         "logo-icon-name", "org.xfce.terminal",
+                         "logo-icon-name", "org.termshare.terminal",
                          "program-name", PACKAGE_NAME,
                          "translator-credits", _("translator-credits"),
                          "version", VERSION_FULL,
-                         "website", "https://docs.xfce.org/apps/terminal/start",
-                         "website-label", _("Visit Xfce Terminal website"),
+                         "website", "https://github.com/jamesd-comelang/termshare",
+                         "website-label", _("Visit Termshare website"),
                          NULL);
 }
 
