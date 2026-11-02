@@ -22,7 +22,7 @@ dependency_versions = {
   'gtk': '>= 3.24.0',
   'vte': '>= 0.51.3',
   'pcre2': '>= 10.00',
-  'xfce4': '>= 4.18.0',
+  'xfce4': '>= 4.16.0',
   'libxfce4session-client': '>= 4.21.2',
 
   'libx11': '>= 1.6.7',
