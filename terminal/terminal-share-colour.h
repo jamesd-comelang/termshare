@@ -43,14 +43,15 @@
  *              foreground/background colours, underline and
  *              strikethrough, but NOT bold or italic -- those fields
  *              are left FALSE here, never invented.  Colours are
- *              marked explicit (fg_set/bg_set TRUE) in this backend:
- *              there is no reliable public getter for the terminal's
- *              default colours to compare against, so unlike the HTML
- *              backend (where default text has no markup at all) a
- *              Jammy plain row is sent with the host's exact default
- *              colours.  Visually that matches the host more closely,
- *              not less; it is a documented backend difference, not
- *              a bug.
+ *              marked explicit (fg_set/bg_set TRUE) in this backend
+ *              for cells that have an attribute entry.  Cells with
+ *              no entry, and default runs from the other backends,
+ *              stay unset here: the sharing server's caller
+ *              (TerminalScreen, which recorded the colours it handed
+ *              to VTE) fills them in with
+ *              terminal_share_colour_apply_defaults(), so no backend
+ *              needs a VTE default-colour getter (there is no public
+ *              one on 0.68/0.76).
  *   plain      Neither backend produced runs: one default run per
  *              row, i.e. today's plain-text behaviour, so sharing
  *              never breaks because colour failed.
@@ -142,6 +143,24 @@ terminal_share_colour_snapshot_free (TerminalShareColourRow *rows,
  * fixed: reset, fg (38;2;R;G;B if set), bg (48;2;R;G;B if set),
  * bold (1), italic (3), underline (4), strikethrough (9),
  * reverse (7), dim (2).  Default runs emit only the reset. */
+/* Fill in any unset colours in every run of every row with the
+ * given host default colours, leaving explicitly-set colours
+ * untouched.  This is how the sharing server stops a remote grid
+ * showing the remote terminal's own background: default runs
+ * (HTML backend: unmarked text; attributes backend: cells with no
+ * attribute entry, e.g. trailing/blank cells; plain fallback: the
+ * whole row) would otherwise be sent with no background at all,
+ * and the client erases those cells with the remote default.  The
+ * colours passed here must be the host's actual VTE colours (see
+ * TerminalScreen's recorded foreground/background), never an
+ * invented theme colour: if the host's own background is grey,
+ * the remote grid will (correctly) be grey too. */
+void
+terminal_share_colour_apply_defaults (TerminalShareColourRow *rows,
+                                      glong n_rows,
+                                      guint8 fg_r, guint8 fg_g, guint8 fg_b,
+                                      guint8 bg_r, guint8 bg_g, guint8 bg_b);
+
 gchar *
 terminal_share_colour_row_to_sgr (const TerminalShareColourRow *row,
                                   glong cols);

@@ -1205,6 +1205,37 @@ colour_append_run_sgr (GString *out, const TerminalShareColourRun *run)
   g_string_free (params, TRUE);
 }
 
+void
+terminal_share_colour_apply_defaults (TerminalShareColourRow *rows,
+                                      glong n_rows,
+                                      guint8 fg_r, guint8 fg_g, guint8 fg_b,
+                                      guint8 bg_r, guint8 bg_g, guint8 bg_b)
+{
+  glong i;
+  gsize j;
+  if (rows == NULL)
+    return;
+  for (i = 0; i < n_rows; i++)
+    for (j = 0; j < rows[i].n_runs; j++)
+      {
+        TerminalShareColourRun *run = &rows[i].runs[j];
+        if (!run->fg_set)
+          {
+            run->fg_set = TRUE;
+            run->fg_r = fg_r;
+            run->fg_g = fg_g;
+            run->fg_b = fg_b;
+          }
+        if (!run->bg_set)
+          {
+            run->bg_set = TRUE;
+            run->bg_r = bg_r;
+            run->bg_g = bg_g;
+            run->bg_b = bg_b;
+          }
+      }
+}
+
 gchar *
 terminal_share_colour_row_to_sgr (const TerminalShareColourRow *row,
                                   glong cols)

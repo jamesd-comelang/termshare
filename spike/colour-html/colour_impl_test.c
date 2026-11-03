@@ -535,6 +535,39 @@ main (int argc, char **argv)
       check (0, "post-alt snapshot returned TRUE");
   }
 
+  /* Default-colour fill (no VTE needed): a run with only fg set
+   * must gain the host bg, a fully-default run must gain both,
+   * and an explicitly-set colour must never be overwritten.
+   * This is what stops a remote grid showing the remote
+   * terminal's own background for default/blank cells. */
+  {
+    TerminalShareColourRow row;
+    TerminalShareColourRun runs[2];
+    gchar *sgr;
+    memset (&row, 0, sizeof (row));
+    memset (runs, 0, sizeof (runs));
+    row.text = "ab";
+    row.runs = runs;
+    row.n_runs = 2;
+    runs[0].start_col = 0; runs[0].end_col = 1;
+    runs[0].fg_set = TRUE; runs[0].fg_r = 10; runs[0].fg_g = 20; runs[0].fg_b = 30;
+    runs[1].start_col = 1; runs[1].end_col = 2;
+    terminal_share_colour_apply_defaults (&row, 1, 70, 80, 90, 40, 50, 60);
+    check (runs[0].fg_set && runs[0].fg_r == 10 && runs[0].fg_g == 20
+           && runs[0].fg_b == 30, "apply_defaults keeps explicit fg");
+    check (runs[0].bg_set && runs[0].bg_r == 40 && runs[0].bg_g == 50
+           && runs[0].bg_b == 60, "apply_defaults fills missing bg");
+    check (runs[1].fg_set && runs[1].fg_r == 70 && runs[1].fg_g == 80
+           && runs[1].fg_b == 90 && runs[1].bg_set && runs[1].bg_r == 40
+           && runs[1].bg_g == 50 && runs[1].bg_b == 60,
+           "apply_defaults fills fully-default run");
+    sgr = terminal_share_colour_row_to_sgr (&row, 2);
+    check (sgr != NULL && strstr (sgr, "38;2;10;20;30;48;2;40;50;60") != NULL
+           && strstr (sgr, "38;2;70;80;90;48;2;40;50;60") != NULL,
+           "apply_defaults SGR carries host fg+bg");
+    g_free (sgr);
+  }
+
   printf ("COLOUR IMPL TEST RESULT: %s (%d failures, %d notes)\n",
           failures == 0 ? "PASS" : "FAIL", failures, notes);
   return failures == 0 ? 0 : 1;

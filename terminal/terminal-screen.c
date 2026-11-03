@@ -235,6 +235,17 @@ struct _TerminalScreen
   GtkWidget *tab_label;
 
   GdkRGBA background_color;
+  /* Foreground set alongside background_color by
+   * terminal_screen_update_colors(), and whether both are the
+   * colours actually passed to VTE.  The share snapshot uses them
+   * to fill in default (unset) run colours, so a remote grid shows
+   * the host's background instead of the remote terminal's own
+   * background (see terminal_share_colour_apply_defaults()).  On
+   * the invalid-palette path VTE falls back to its own defaults,
+   * which are not stored here, so has_default_colors is FALSE
+   * there and the snapshot leaves defaults unset, as before. */
+  GdkRGBA foreground_color;
+  guint has_default_colors : 1;
 
   guint session_id;
 
@@ -1276,10 +1287,17 @@ terminal_screen_update_colors (TerminalScreen *screen)
                                has_fg ? &fg : NULL,
                                has_bg ? &screen->background_color : NULL,
                                palette, 16);
+      /* Record the exact colours handed to VTE for the share
+       * snapshot's default-colour fill (see above).  has_fg is
+       * always TRUE here: update_colors forces it from the theme
+       * when no explicit foreground is set. */
+      screen->foreground_color = fg;
+      screen->has_default_colors = TRUE;
     }
   else
     {
       vte_terminal_set_default_colors (VTE_TERMINAL (screen->terminal));
+      screen->has_default_colors = FALSE;
       g_warning ("One of the terminal colors was not parsed successfully. "
                  "The default palette has been applied.");
     }
@@ -3353,6 +3371,34 @@ terminal_screen_get_share_snapshot_coloured (TerminalScreen *screen,
   if (!terminal_share_colour_snapshot (terminal, first_visible,
                                        n_cols, n_rows, &colour_rows))
     return FALSE;
+
+  /* Fill unset run colours with the host's own VTE colours, so
+   * default text and blank/trailing cells render on the host's
+   * background on the remote terminal, not the remote terminal's
+   * own background (which is what the user saw as a grey grid).
+   * Transparency is not representable remotely: the RGB of a
+   * translucent host background is sent as-is.  If the host has
+   * no recorded defaults (invalid palette path), leave runs
+   * unchanged, as before. */
+  if (screen->has_default_colors)
+    {
+      guint8 fg_r, fg_g, fg_b, bg_r, bg_g, bg_b;
+      fg_r = (guint8) CLAMP (screen->foreground_color.red * 255.0 + 0.5,
+                             0, 255);
+      fg_g = (guint8) CLAMP (screen->foreground_color.green * 255.0 + 0.5,
+                             0, 255);
+      fg_b = (guint8) CLAMP (screen->foreground_color.blue * 255.0 + 0.5,
+                             0, 255);
+      bg_r = (guint8) CLAMP (screen->background_color.red * 255.0 + 0.5,
+                             0, 255);
+      bg_g = (guint8) CLAMP (screen->background_color.green * 255.0 + 0.5,
+                             0, 255);
+      bg_b = (guint8) CLAMP (screen->background_color.blue * 255.0 + 0.5,
+                             0, 255);
+      terminal_share_colour_apply_defaults (colour_rows, n_rows,
+                                            fg_r, fg_g, fg_b,
+                                            bg_r, bg_g, bg_b);
+    }
 
   lines = g_new0 (gchar *, n_rows);
   for (i = 0; i < n_rows; i++)
