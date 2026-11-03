@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 /* colour_impl_test.c -- test the production colour abstraction layer.
  *
  * NOT production code, test only.  Creates a VteTerminal with no

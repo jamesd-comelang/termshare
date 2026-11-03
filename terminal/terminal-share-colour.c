@@ -642,20 +642,6 @@ colour_plain_lines (VteTerminal *terminal, glong rows)
   return lines;
 }
 
-/* Cell width of a plain-text line, in visible cells. */
-static glong
-colour_line_cells (const gchar *line)
-{
-  const gchar *p = line;
-  glong cells = 0;
-  while (*p != '\0')
-    {
-      gunichar ch = g_utf8_get_char (p);
-      cells += colour_char_width (ch);
-      p = g_utf8_next_char (p);
-    }
-  return cells;
-}
 
 /* Does html_text agree with plain_text as a prefix (in codepoints),
  * allowing html_text to be shorter only because of trimmed trailing
