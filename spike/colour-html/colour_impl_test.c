@@ -459,6 +459,31 @@ main (int argc, char **argv)
     adj = gtk_scrollable_get_vadjustment (GTK_SCROLLABLE (term));
     first_visible = adj ? (glong) gtk_adjustment_get_value (adj) : 0;
     printf ("alt first_visible=%ld\n", first_visible);
+    /* Diagnostic (test only): what does get_text_range + attributes
+     * actually return for the alt screen on this VTE?  This is the
+     * Jammy attributes-backend input, printed raw. */
+    {
+      GArray *da = g_array_new (FALSE, FALSE, sizeof (VteCharAttributes));
+      gchar *dt = vte_terminal_get_text_range (term, 11, 0, 11, 40,
+                                               NULL, NULL, da);
+      printf ("--- ALT RANGE DIAG row 11 text=[%s] attrs_len=%u ---\n",
+              dt ? dt : "(NULL)", (unsigned) da->len);
+      {
+        gsize dj;
+        for (dj = 0; dj < da->len; dj++)
+          {
+            VteCharAttributes *a = &g_array_index (da, VteCharAttributes, dj);
+            printf ("  attr row=%ld col=%ld fore=#%04X%04X%04X back=#%04X%04X%04X u=%d s=%d\n",
+                    (long) a->row, (long) a->column,
+                    a->fore.red, a->fore.green, a->fore.blue,
+                    a->back.red, a->back.green, a->back.blue,
+                    (int) a->underline, (int) a->strikethrough);
+          }
+      }
+      g_free (dt);
+      g_array_free (da, TRUE);
+      fflush (stdout);
+    }
     if (terminal_share_colour_snapshot (term, first_visible, cols, rows, &snap))
       {
         glong ai;
