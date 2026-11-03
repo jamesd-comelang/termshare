@@ -77,6 +77,9 @@ typedef struct
   gchar **tabs;
   gint n_tabs;
   gint active_tab;
+  /* Parsed from the TABBAR flag and kept for protocol
+   * compatibility, but deliberately not rendered: the user
+   * said the × is not necessary. */
   gboolean tabs_close_buttons;
   glong client_cols;
   glong client_rows;
@@ -345,8 +348,9 @@ client_ellipsize_title (const gchar *title, glong max_cells)
   return g_string_free (s, FALSE);
 }
 
-/* Width of one rendered tab cell: " " + title + (" ×" if the host
- * shows close buttons) + " ". */
+/* Width of one rendered tab cell: " " + title + " ".  The
+ * close_buttons parameter is retained for compatibility but
+ * rendering always passes FALSE: the × is not rendered. */
 static glong
 client_tab_cell_width (glong title_cells, gboolean close_buttons)
 {
@@ -398,15 +402,14 @@ client_render_tabbar (GString *out, Client *c)
           if (i > 0)
             g_string_append (out, "│");
           g_string_append (out, i == c->active_tab ? active_style : strip_style);
-          g_string_append_printf (out, " %s%s ", shown[i],
-                                  c->tabs_close_buttons ? " ×" : "");
+          g_string_append_printf (out, " %s ", shown[i]);
         }
       g_string_append (out, "\e[0m");
       goto done;
     }
 
   /* Overflow: shrink inactive tabs first, widest first, down to
-   * a minimum cell (" … " plus the close mark if shown), keeping
+   * a minimum cell (" … "), keeping
    * the active tab fully visible. Only if every inactive tab is
    * at its minimum and the bar still does not fit do we ellipsize
    * the active tab, and only after that drop inactive tabs
@@ -420,7 +423,7 @@ client_render_tabbar (GString *out, Client *c)
           if (!visible[i])
             continue;
           total += client_tab_cell_width (shown_width[i],
-                                          c->tabs_close_buttons);
+                                          FALSE);
           n_visible++;
         }
       if (n_visible > 1)
@@ -430,14 +433,14 @@ client_render_tabbar (GString *out, Client *c)
       {
         gint widest = -1;
         glong widest_width = 0;
-        glong min_width = client_tab_cell_width (1, c->tabs_close_buttons);
+        glong min_width = client_tab_cell_width (1, FALSE);
         for (i = 0; i < c->n_tabs; i++)
           {
             glong w;
             if (!visible[i] || i == c->active_tab)
               continue;
             w = client_tab_cell_width (shown_width[i],
-                                       c->tabs_close_buttons);
+                                       FALSE);
             if (w > min_width && w > widest_width)
               {
                 widest = i;
@@ -466,7 +469,7 @@ client_render_tabbar (GString *out, Client *c)
           && visible[c->active_tab])
         {
           glong budget = width
-              - client_tab_cell_width (0, c->tabs_close_buttons);
+              - client_tab_cell_width (0, FALSE);
           /* title cells available: width minus padding/close */
           gchar *next;
           if (budget < 1)
@@ -509,7 +512,7 @@ client_render_tabbar (GString *out, Client *c)
               if (!visible[i])
                 continue;
               total += client_tab_cell_width (shown_width[i],
-                                              c->tabs_close_buttons);
+                                              FALSE);
               n_visible++;
             }
           if (n_visible > 1)
@@ -543,27 +546,69 @@ client_render_tabbar (GString *out, Client *c)
         }
     }
 
-  /* Render visible tabs, then fill the rest of the row with the
-   * strip background so the strip spans the full width. */
-  rendered = 0;
-  n_visible = 0;
-  for (i = 0; i < c->n_tabs; i++)
-    {
-      if (!visible[i])
-        continue;
-      if (n_visible > 0)
-        {
-          g_string_append (out, strip_style);
-          g_string_append (out, "│");
-          rendered += 1;
-        }
-      g_string_append (out, i == c->active_tab ? active_style : strip_style);
-      g_string_append_printf (out, " %s%s ", shown[i],
-                              c->tabs_close_buttons ? " ×" : "");
-      rendered += client_tab_cell_width (shown_width[i],
-                                         c->tabs_close_buttons);
-      n_visible++;
-    }
+  /* Expand to fill the width, like the host: every host tab has
+   * tab-expand/tab-fill TRUE, so GTK distributes the strip's
+   * spare width equally among the tabs instead of leaving a
+   * filler strip at the end.  Distribute the remaining slack
+   * as extra padding inside each visible tab cell, split as
+   * evenly as possible between its left and right padding;
+   * the first tabs get the odd remainder cell.  After this,
+   * the tabs collectively occupy exactly the grid width. */
+  {
+    glong *left_pad, *right_pad;
+    glong slack, base, rem;
+    left_pad = g_new0 (glong, c->n_tabs);
+    right_pad = g_new0 (glong, c->n_tabs);
+    for (i = 0; i < c->n_tabs; i++)
+      { left_pad[i] = 1; right_pad[i] = 1; }
+    /* Recompute total after the give-back above. */
+    total = 0; n_visible = 0;
+    for (i = 0; i < c->n_tabs; i++)
+      {
+        if (!visible[i]) continue;
+        total += client_tab_cell_width (shown_width[i], FALSE);
+        n_visible++;
+      }
+    if (n_visible > 1) total += n_visible - 1;
+    slack = (total < width) ? (width - total) : 0;
+    base = n_visible > 0 ? slack / n_visible : 0;
+    rem = n_visible > 0 ? slack % n_visible : 0;
+    for (i = 0; i < c->n_tabs; i++)
+      {
+        glong extra;
+        if (!visible[i]) continue;
+        extra = base + (rem > 0 ? 1 : 0);
+        if (rem > 0) rem--;
+        left_pad[i] += extra / 2;
+        right_pad[i] += extra - extra / 2;
+      }
+    /* Render visible tabs, expanded to the full width.  The
+     * filler below is only a safety net (rounding must not
+     * leave a gap); normally rendered == width already. */
+    rendered = 0;
+    n_visible = 0;
+    for (i = 0; i < c->n_tabs; i++)
+      {
+        glong j;
+        if (!visible[i]) continue;
+        if (n_visible > 0)
+          {
+            g_string_append (out, strip_style);
+            g_string_append (out, "│");
+            rendered += 1;
+          }
+        g_string_append (out, i == c->active_tab ? active_style : strip_style);
+        for (j = 0; j < left_pad[i]; j++) g_string_append_c (out, ' ');
+        g_string_append (out, shown[i]);
+        for (j = 0; j < right_pad[i]; j++) g_string_append_c (out, ' ');
+        rendered += left_pad[i] + shown_width[i] + right_pad[i];
+        n_visible++;
+      }
+    g_free (left_pad);
+    g_free (right_pad);
+  }
+  /* Safety net only: after expansion rendered should already
+   * equal width; fill any rounding gap with strip background. */
   if (rendered < width)
     {
       glong j;

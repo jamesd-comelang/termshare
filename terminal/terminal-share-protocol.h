@@ -38,8 +38,9 @@
  *   SYNC <cols> <rows> <cursor-col> <cursor-row>\n
  *   TABBAR <active-index> <close-buttons 0/1>\t<title>\t<title>...\n
  *     (close-buttons is the host's misc-tab-close-buttons
- *     preference, so the client shows " ×" only when the host
- *     shows a close button; old clients ignore it, since atoi()
+ *     preference, kept for protocol compatibility; current
+ *     clients parse it but do not render a close mark, since
+ *     the × is not necessary.  Old clients ignore it, since atoi()
  *     stops at the space and titles follow the tab separator)
  *   <grid row 0>\n ... <grid row rows-1>\n
  *     (cols/rows are the grid size; cursor-row is a visible row;
