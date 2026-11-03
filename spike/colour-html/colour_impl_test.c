@@ -482,6 +482,24 @@ main (int argc, char **argv)
       }
       g_free (dt);
       g_array_free (da, TRUE);
+      /* Scan absolute rows 0..35 for ALTRED via get_text_range:
+       * if the alt screen lives at some other absolute row on
+       * this VTE, this finds the mapping; if nothing returns
+       * ALTRED, the range API simply cannot see the alt screen. */
+      {
+        glong sr;
+        for (sr = 0; sr < 36; sr++)
+          {
+            GArray *sa = g_array_new (FALSE, FALSE, sizeof (VteCharAttributes));
+            gchar *st = vte_terminal_get_text_range (term, sr, 0, sr, 40,
+                                                     NULL, NULL, sa);
+            if (st != NULL && st[0] != '\0')
+              printf ("  range row %ld text=[%s] attrs=%u\n", sr, st,
+                      (unsigned) sa->len);
+            g_free (st);
+            g_array_free (sa, TRUE);
+          }
+      }
       fflush (stdout);
     }
     if (terminal_share_colour_snapshot (term, first_visible, cols, rows, &snap))
