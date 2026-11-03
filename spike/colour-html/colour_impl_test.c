@@ -458,6 +458,7 @@ main (int argc, char **argv)
     pump ();
     adj = gtk_scrollable_get_vadjustment (GTK_SCROLLABLE (term));
     first_visible = adj ? (glong) gtk_adjustment_get_value (adj) : 0;
+    printf ("alt first_visible=%ld\n", first_visible);
     if (terminal_share_colour_snapshot (term, first_visible, cols, rows, &snap))
       {
         glong ai;

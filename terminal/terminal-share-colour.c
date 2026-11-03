@@ -766,6 +766,33 @@ colour_split_full_html (const gchar *full_html, glong *n_rows_out)
   return rows;
 }
 
+
+/* Does range_text (as returned by get_text_range, possibly with a
+ * trailing newline) describe the same row as plain_line?  Trailing
+ * whitespace is ignored on both sides; any other difference means
+ * a different row. */
+static gboolean
+colour_range_text_matches (const gchar *range_text,
+                           const gchar *plain_line)
+{
+  gchar *r, *pl;
+  gboolean ok;
+  gsize len;
+  if (range_text == NULL || plain_line == NULL)
+    return FALSE;
+  r = g_strdup (range_text);
+  pl = g_strdup (plain_line);
+  g_strchomp (r);
+  len = strlen (pl);
+  while (len > 0 && (pl[len - 1] == ' ' || pl[len - 1] == '\t'
+                     || pl[len - 1] == '\r' || pl[len - 1] == '\n'))
+    pl[--len] = '\0';
+  ok = (g_strcmp0 (r, pl) == 0);
+  g_free (r);
+  g_free (pl);
+  return ok;
+}
+
 static gboolean
 colour_html_snapshot (VteTerminal *terminal,
                       glong first_visible,
@@ -834,6 +861,24 @@ colour_html_snapshot (VteTerminal *terminal,
                   ok = (runs != NULL);
                 }
             }
+          /* Alt screen: the scrollback offset does not apply there,
+           * so first_visible + i can point at the wrong row.  Retry
+           * with the visible row number; the text check in
+           * colour_html_row_runs tells the two cases apart. */
+          if (!ok && first_visible != 0)
+            {
+              glong vis_row = i;
+              gchar *h = colour_get_text_range_format (terminal,
+                                                       TERMSHARE_VTE_FORMAT_HTML,
+                                                       vis_row, 0, vis_row,
+                                                       cols, NULL);
+              if (h != NULL)
+                {
+                  runs = colour_html_row_runs (h, out_rows[i].text, &n_runs);
+                  g_free (h);
+                  ok = (runs != NULL);
+                }
+            }
         }
       if (!ok)
         runs = colour_default_runs (cols, &n_runs);
@@ -875,6 +920,26 @@ colour_attributes_snapshot (VteTerminal *terminal,
       text = vte_terminal_get_text_range (terminal, abs_row, 0,
                                           abs_row, cols,
                                           NULL, NULL, attrs);
+      /* Alt screen: the scrollback offset does not apply there, so
+       * first_visible + i can point past the alt screen (NULL) or
+       * at the wrong row (text mismatch).  In that case retry with
+       * the visible row number, which is the alt-screen row.  The
+       * text check is what tells the two cases apart; without it
+       * an alt-screen row would silently render in default colours
+       * on Jammy, while the HTML backend (visible-only full HTML)
+       * renders it correctly on Noble. */
+      if ((text == NULL || attrs->len == 0
+           || !colour_range_text_matches (text, out_rows[i].text))
+          && first_visible != 0)
+        {
+          g_free (text);
+          g_array_free (attrs, TRUE);
+          attrs = g_array_new (FALSE, FALSE, sizeof (VteCharAttributes));
+          abs_row = i;
+          text = vte_terminal_get_text_range (terminal, abs_row, 0,
+                                              abs_row, cols,
+                                              NULL, NULL, attrs);
+        }
       if (text == NULL || attrs->len == 0)
         {
           g_free (text);
