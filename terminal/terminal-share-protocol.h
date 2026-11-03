@@ -36,7 +36,11 @@
  *   WELCOME 1\n
  *   LIST\nWINDOW <id>\t<title>\nTAB <window-id>\t<tab-id>\t<active 0/1>\t<title>\nEND\n
  *   SYNC <cols> <rows> <cursor-col> <cursor-row>\n
- *   TABBAR <active-index>\t<title>\t<title>...\n
+ *   TABBAR <active-index> <close-buttons 0/1>\t<title>\t<title>...\n
+ *     (close-buttons is the host's misc-tab-close-buttons
+ *     preference, so the client shows " ×" only when the host
+ *     shows a close button; old clients ignore it, since atoi()
+ *     stops at the space and titles follow the tab separator)
  *   <grid row 0>\n ... <grid row rows-1>\n
  *     (cols/rows are the grid size; cursor-row is a visible row;
  *     the TABBAR line and exactly <rows> grid lines follow the SYNC
@@ -44,7 +48,7 @@
  *   UPDATE <cursor-col> <cursor-row>\nROW <row>\t<text>\n...
  *     (zero or more ROW lines; no ROW lines means cursor-only move)
  *   SIZE <cols> <rows>\n       (grid size changed; a SYNC follows)
- *   TABBAR <active-index>\t<title>...\n
+ *   TABBAR <active-index> <close-buttons 0/1>\t<title>...\n
  *   BUSY\n
  *   ERROR <message>\n
  *   BYE <reason>\n

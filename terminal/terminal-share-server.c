@@ -219,7 +219,20 @@ share_server_build_tabbar (TerminalShareServer *server,
           && TERMINAL_SCREEN (page) == active_screen)
         active_index = i;
     }
-  g_string_append_printf (s, "%d", active_index);
+  /* Close-button flag, host-accurate: the host tab label binds
+   * its close button's visibility to misc-tab-close-buttons, so
+   * the client shows " ×" only when the host does. The flag rides
+   * in the TABBAR header after a space, so an old client still
+   * parses the active index (atoi stops at the space) and the
+   * titles unchanged. */
+  {
+    gboolean close_buttons = TRUE;
+    GObject *prefs = terminal_window_get_preferences (window);
+    if (prefs != NULL)
+      g_object_get (prefs, "misc-tab-close-buttons", &close_buttons, NULL);
+    g_string_append_printf (s, "%d %d", active_index,
+                            close_buttons ? 1 : 0);
+  }
   for (i = 0; i < n_pages; i++)
     {
       GtkWidget *page = gtk_notebook_get_nth_page (notebook, i);

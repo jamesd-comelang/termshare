@@ -36,7 +36,10 @@
  * Layout (three chrome rows above the grid):
  *   row 0: menu, dim
  *   row 1: indicator, green (this client is connected)
- *   row 2: tab bar, active tab in reverse video
+ *   row 2: tab bar, like the host's GtkNotebook strip: padded tabs
+ *     separated by │, the active tab bold dark-on-light, inactive
+ *     tabs light-on-dark, the strip filled to the full grid width.
+ *     Display-only, like the menu: no mouse, no remote close.
  *   row 3+: the shared grid
  */
 
@@ -74,6 +77,7 @@ typedef struct
   gchar **tabs;
   gint n_tabs;
   gint active_tab;
+  gboolean tabs_close_buttons;
   glong client_cols;
   glong client_rows;
   gchar *exit_message;
@@ -243,27 +247,338 @@ client_render_indicator (GString *out, Client *c)
   g_string_append (out, "\e[0m");
 }
 
+/* ------------------------------------------------------------------ */
+/* Tab bar: host-like GtkNotebook strip in character cells             */
+/* ------------------------------------------------------------------ */
+
+/* Visible-cell width of a string: SGR sequences count as 0, wide
+ * (CJK etc.) characters count as 2, everything else as 1. The tab
+ * bar bypasses client_render_row_text, so it must do its own
+ * width accounting or a long bar wraps and corrupts the grid. */
+static gboolean
+client_char_is_wide (gunichar ch)
+{
+  return (ch >= 0x1100 && ch <= 0x115F)
+      || (ch >= 0x2E80 && ch <= 0x303E)
+      || (ch >= 0x3041 && ch <= 0xA4CF)
+      || (ch >= 0xAC00 && ch <= 0xD7A3)
+      || (ch >= 0xF900 && ch <= 0xFAFF)
+      || (ch >= 0xFE10 && ch <= 0xFE19)
+      || (ch >= 0xFE30 && ch <= 0xFE6F)
+      || (ch >= 0xFF00 && ch <= 0xFF60)
+      || (ch >= 0xFFE0 && ch <= 0xFFE6)
+      || (ch >= 0x20000 && ch <= 0x2FFFD)
+      || (ch >= 0x30000 && ch <= 0x3FFFD);
+}
+
+static glong
+client_visible_width (const gchar *s)
+{
+  glong width = 0;
+  const gchar *p;
+  if (s == NULL)
+    return 0;
+  for (p = s; *p != '\0';)
+    {
+      gunichar ch;
+      if (p[0] == '\e' && p[1] == '[')
+        {
+          const gchar *q = p + 2;
+          while (*q != '\0' && !(*q >= '@' && *q <= '~'))
+            q++;
+          if (*q != '\0')
+            q++;
+          p = q;
+          continue;
+        }
+      ch = g_utf8_get_char (p);
+      if (ch == (gunichar) -1)
+        {
+          width += 1;
+          p++;
+          continue;
+        }
+      width += client_char_is_wide (ch) ? 2 : 1;
+      p = g_utf8_next_char (p);
+    }
+  return width;
+}
+
+/* Truncate a title to at most max_cells visible cells, appending
+ * "…" when truncated. A wide character that would straddle the
+ * limit is skipped, never split. */
+static gchar *
+client_ellipsize_title (const gchar *title, glong max_cells)
+{
+  GString *s;
+  glong cells = 0;
+  const gchar *p;
+  if (max_cells <= 0)
+    return g_strdup ("");
+  if (client_visible_width (title) <= max_cells)
+    return g_strdup (title);
+  if (max_cells == 1)
+    return g_strdup ("…");
+  s = g_string_new ("");
+  for (p = title; *p != '\0' && cells < max_cells - 1;)
+    {
+      gunichar ch = g_utf8_get_char (p);
+      glong cw;
+      const gchar *next;
+      if (ch == (gunichar) -1)
+        {
+          cw = 1;
+          next = p + 1;
+        }
+      else
+        {
+          cw = client_char_is_wide (ch) ? 2 : 1;
+          next = g_utf8_next_char (p);
+        }
+      if (cells + cw > max_cells - 1)
+        break;
+      g_string_append_len (s, p, next - p);
+      cells += cw;
+      p = next;
+    }
+  g_string_append (s, "…");
+  return g_string_free (s, FALSE);
+}
+
+/* Width of one rendered tab cell: " " + title + (" ×" if the host
+ * shows close buttons) + " ". */
+static glong
+client_tab_cell_width (glong title_cells, gboolean close_buttons)
+{
+  return 1 + title_cells + (close_buttons ? 2 : 0) + 1;
+}
+
 static void
 client_render_tabbar (GString *out, Client *c)
 {
-  GString *bar = g_string_new ("");
-  gint i;
+  /* Fixed 256-colour pair, fg and bg both set explicitly so the
+   * strip is readable on dark and light remote terminals alike
+   * (the protocol does not carry the host theme, so this is a
+   * stylised tab strip, not the host's exact colours). Active:
+   * bold dark-on-light, like a raised tab; inactive and filler:
+   * light-on-dark, like the host's dimmer tab strip. */
+  const gchar *strip_style = "\e[38;5;250;48;5;240m";
+  const gchar *active_style = "\e[1;38;5;240;48;5;250m";
+  glong width = c->grid_cols;
+  gchar **shown = NULL;
+  glong *shown_width = NULL;
+  gboolean *visible = NULL;
+  glong total, rendered;
+  gint i, n_visible;
+
+  g_string_append (out, "\e[3;1H\e[K");
+  if (c->n_tabs <= 0)
+    {
+      g_string_append (out, "\e[0m");
+      return;
+    }
+
+  shown = g_new0 (gchar *, c->n_tabs);
+  shown_width = g_new0 (glong, c->n_tabs);
+  visible = g_new0 (gboolean, c->n_tabs);
   for (i = 0; i < c->n_tabs; i++)
     {
-      if (i > 0)
-        g_string_append (bar, " | ");
-      if (i == c->active_tab)
-        g_string_append_printf (bar, "\e[7m%s\e[0m", c->tabs[i]);
-      else
-        g_string_append (bar, c->tabs[i]);
+      shown[i] = g_strdup (c->tabs[i] != NULL ? c->tabs[i] : "");
+      shown_width[i] = client_visible_width (shown[i]);
+      visible[i] = TRUE;
     }
-  /* The reverse-video escapes must not count against the width
-   * truncation in client_render_row_text, so render the bar
-   * directly: move, erase, print, then reset. */
-  g_string_append (out, "\e[3;1H\e[K");
-  g_string_append (out, bar->str);
+
+  if (width <= 0)
+    {
+      /* No grid size yet: render untruncated, no filler. */
+      for (i = 0; i < c->n_tabs; i++)
+        {
+          if (i > 0)
+            g_string_append (out, strip_style);
+          if (i > 0)
+            g_string_append (out, "│");
+          g_string_append (out, i == c->active_tab ? active_style : strip_style);
+          g_string_append_printf (out, " %s%s ", shown[i],
+                                  c->tabs_close_buttons ? " ×" : "");
+        }
+      g_string_append (out, "\e[0m");
+      goto done;
+    }
+
+  /* Overflow: shrink inactive tabs first, widest first, down to
+   * a minimum cell (" … " plus the close mark if shown), keeping
+   * the active tab fully visible. Only if every inactive tab is
+   * at its minimum and the bar still does not fit do we ellipsize
+   * the active tab, and only after that drop inactive tabs
+   * farthest from the active one. The bar never wraps. */
+  for (;;)
+    {
+      total = 0;
+      n_visible = 0;
+      for (i = 0; i < c->n_tabs; i++)
+        {
+          if (!visible[i])
+            continue;
+          total += client_tab_cell_width (shown_width[i],
+                                          c->tabs_close_buttons);
+          n_visible++;
+        }
+      if (n_visible > 1)
+        total += n_visible - 1; /* │ separators */
+      if (total <= width)
+        break;
+      {
+        gint widest = -1;
+        glong widest_width = 0;
+        glong min_width = client_tab_cell_width (1, c->tabs_close_buttons);
+        for (i = 0; i < c->n_tabs; i++)
+          {
+            glong w;
+            if (!visible[i] || i == c->active_tab)
+              continue;
+            w = client_tab_cell_width (shown_width[i],
+                                       c->tabs_close_buttons);
+            if (w > min_width && w > widest_width)
+              {
+                widest = i;
+                widest_width = w;
+              }
+          }
+        if (widest < 0)
+          break;
+        {
+          glong new_max = shown_width[widest] - 1;
+          gchar *next;
+          if (new_max < 1)
+            new_max = 1;
+          next = client_ellipsize_title (c->tabs[widest], new_max);
+          g_free (shown[widest]);
+          shown[widest] = next;
+          shown_width[widest] = client_visible_width (next);
+        }
+      }
+    }
+
+  if (total > width)
+    {
+      /* Active tab alone still too wide: ellipsize it to fit. */
+      if (c->active_tab >= 0 && c->active_tab < c->n_tabs
+          && visible[c->active_tab])
+        {
+          glong budget = width
+              - client_tab_cell_width (0, c->tabs_close_buttons);
+          /* title cells available: width minus padding/close */
+          gchar *next;
+          if (budget < 1)
+            budget = 1;
+          next = client_ellipsize_title (c->tabs[c->active_tab], budget);
+          g_free (shown[c->active_tab]);
+          shown[c->active_tab] = next;
+          shown_width[c->active_tab] =
+              client_visible_width (next);
+        }
+      /* Still too wide (many tabs at minimum): drop inactive
+       * tabs farthest from the active one, one at a time. */
+      while (total > width)
+        {
+          gint farthest = -1;
+          gint farthest_dist = -1;
+          for (i = 0; i < c->n_tabs; i++)
+            {
+              gint dist;
+              if (!visible[i] || i == c->active_tab)
+                continue;
+              dist = i > c->active_tab ? i - c->active_tab
+                                       : c->active_tab - i;
+              /* On a tie, drop the rightmost tab first, so the
+               * strip keeps its leftmost tabs and overflows to
+               * the right, like a notebook strip. */
+              if (dist >= farthest_dist)
+                {
+                  farthest = i;
+                  farthest_dist = dist;
+                }
+            }
+          if (farthest < 0)
+            break;
+          visible[farthest] = FALSE;
+          total = 0;
+          n_visible = 0;
+          for (i = 0; i < c->n_tabs; i++)
+            {
+              if (!visible[i])
+                continue;
+              total += client_tab_cell_width (shown_width[i],
+                                              c->tabs_close_buttons);
+              n_visible++;
+            }
+          if (n_visible > 1)
+            total += n_visible - 1;
+        }
+    }
+
+  /* If dropping a tab freed space, give it back to the remaining
+   * inactive tabs (left to right, up to their full titles), so a
+   * dropped tab does not leave the survivors stuck at "…". */
+  if (total < width)
+    {
+      glong slack = width - total;
+      for (i = 0; i < c->n_tabs && slack > 0; i++)
+        {
+          glong orig_width, new_max;
+          gchar *next;
+          if (!visible[i] || i == c->active_tab)
+            continue;
+          orig_width = client_visible_width (c->tabs[i]);
+          if (shown_width[i] >= orig_width)
+            continue;
+          new_max = shown_width[i] + slack;
+          if (new_max > orig_width)
+            new_max = orig_width;
+          next = client_ellipsize_title (c->tabs[i], new_max);
+          slack -= client_visible_width (next) - shown_width[i];
+          g_free (shown[i]);
+          shown[i] = next;
+          shown_width[i] = client_visible_width (next);
+        }
+    }
+
+  /* Render visible tabs, then fill the rest of the row with the
+   * strip background so the strip spans the full width. */
+  rendered = 0;
+  n_visible = 0;
+  for (i = 0; i < c->n_tabs; i++)
+    {
+      if (!visible[i])
+        continue;
+      if (n_visible > 0)
+        {
+          g_string_append (out, strip_style);
+          g_string_append (out, "│");
+          rendered += 1;
+        }
+      g_string_append (out, i == c->active_tab ? active_style : strip_style);
+      g_string_append_printf (out, " %s%s ", shown[i],
+                              c->tabs_close_buttons ? " ×" : "");
+      rendered += client_tab_cell_width (shown_width[i],
+                                         c->tabs_close_buttons);
+      n_visible++;
+    }
+  if (rendered < width)
+    {
+      glong j;
+      g_string_append (out, strip_style);
+      for (j = rendered; j < width; j++)
+        g_string_append_c (out, ' ');
+    }
   g_string_append (out, "\e[0m");
-  g_string_free (bar, TRUE);
+
+done:
+  for (i = 0; i < c->n_tabs; i++)
+    g_free (shown[i]);
+  g_free (shown);
+  g_free (shown_width);
+  g_free (visible);
 }
 
 static void
@@ -330,7 +645,8 @@ client_set_grid (Client *c, glong cols, glong rows, gchar **lines)
 }
 
 static void
-client_set_tabs (Client *c, gint active, gchar **titles, gint n)
+client_set_tabs (Client *c, gint active, gchar **titles, gint n,
+                 gboolean close_buttons)
 {
   gint i;
   if (c->tabs != NULL)
@@ -340,6 +656,7 @@ client_set_tabs (Client *c, gint active, gchar **titles, gint n)
     c->tabs[i] = g_strdup (titles[i]);
   c->n_tabs = n;
   c->active_tab = active;
+  c->tabs_close_buttons = close_buttons;
 }
 
 
@@ -381,9 +698,16 @@ client_split_lines (const guint8 *data, gsize len, gsize *n_out)
 static gboolean
 client_parse_tabbar_line (Client *c, const gchar *line)
 {
-  /* TABBAR <active>\t<title>\t... */
+  /* TABBAR <active> <close-buttons 0/1>\t<title>\t...
+   * The close flag rides in the header field, after a space, so
+   * an old client still parses it: atoi() stops at the space and
+   * titles (fields+1) are unchanged. An old server sends only
+   * "<active>", in which case the flag is absent and defaults
+   * to no close mark. */
   gchar **fields;
   gint i, n, active = -1;
+  gboolean close_buttons = FALSE;
+  const gchar *space;
   if (!g_str_has_prefix (line, "TABBAR "))
     return FALSE;
   fields = g_strsplit (line + 7, "\t", -1);
@@ -394,7 +718,10 @@ client_parse_tabbar_line (Client *c, const gchar *line)
       return FALSE;
     }
   active = atoi (fields[0]);
-  client_set_tabs (c, active, fields + 1, n - 1);
+  space = strchr (fields[0], ' ');
+  if (space != NULL)
+    close_buttons = atoi (space + 1) != 0;
+  client_set_tabs (c, active, fields + 1, n - 1, close_buttons);
   for (i = 0; i < n; i++)
     (void) i;
   g_strfreev (fields);
