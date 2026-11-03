@@ -31,7 +31,11 @@
  *     worse, make a Noble-built binary fail to load on Jammy with
  *     an undefined symbol.  All access is through the dlsym
  *     function pointers below, with the format passed as a plain
- *     int: 0 = TEXT, 1 = HTML, matching the VteFormat enum order.
+ *     int: 1 = TEXT, 2 = HTML, matching the VteFormat enum
+ *     values (VTE_FORMAT_TEXT = 1, VTE_FORMAT_HTML = 2).  The enum
+ *     does NOT start at 0: passing 1 for HTML silently returns plain
+ *     text, which is exactly how this bug first presented (all runs
+ *     default, text correct, no colours).
  *
  *  2. NEVER use a compile-time VTE version check to pick a backend.
  *     The probe in this file runs at runtime, once, and caches its
@@ -47,8 +51,8 @@
 #include <string.h>
 
 /* VteFormat values, as plain ints (see rule 1 above). */
-#define TERMSHARE_VTE_FORMAT_TEXT 0
-#define TERMSHARE_VTE_FORMAT_HTML 1
+#define TERMSHARE_VTE_FORMAT_TEXT 1
+#define TERMSHARE_VTE_FORMAT_HTML 2
 
 typedef char *(*GetTextFormatFn) (VteTerminal *, int);
 typedef char *(*GetTextRangeFormatFn) (VteTerminal *, int,

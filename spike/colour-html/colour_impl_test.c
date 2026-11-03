@@ -253,7 +253,7 @@ main (int argc, char **argv)
         RTLD_DEFAULT, "vte_terminal_get_text_range_format");
     if (fmt != NULL)
       {
-        char *raw = fmt (term, 1);
+        char *raw = fmt (term, 2); /* VTE_FORMAT_HTML = 2 */
         printf ("--- RAW FULL HTML ---\n%s\n--- END RAW FULL HTML ---\n",
                 raw ? raw : "(NULL)");
         g_free (raw);
@@ -262,7 +262,7 @@ main (int argc, char **argv)
       printf ("--- RAW FULL HTML: dlsym get_text_format failed ---\n");
     if (rfmt != NULL)
       {
-        char *raw = rfmt (term, 1, 1, 0, 1, 39, NULL);
+        char *raw = rfmt (term, 2, 1, 0, 1, 39, NULL); /* HTML = 2 */
         printf ("--- RAW ROW 1 HTML ---\n%s\n--- END RAW ROW 1 HTML ---\n",
                 raw ? raw : "(NULL)");
         g_free (raw);

@@ -132,7 +132,11 @@ check(b"ABCDEFGHIJKLMNOPQRST" in out, "long coloured row truncates to 20 visible
 check(b"UVWXYZ" not in out, "long coloured row tail (UVWXYZ) not rendered after truncation")
 # Update row: first 20 of "0123456789ABCDEFGHIJKLMNOP" = 0123456789ABCDEFGHIJ
 check(b"0123456789ABCDEFGHIJ" in out, "UPDATE coloured row truncates to 20 visible chars")
-check(b"KLMNOP" not in out, "UPDATE coloured row tail not rendered")
+# Note: "KLMNOP" alone also appears inside the SYNC row
+# (ABCDEFGHIJKLMNOPQRST), so the tail check must be the full
+# UPDATE string, which must never appear rendered in full.
+check(b"0123456789ABCDEFGHIJKLMNOP" not in out,
+      "UPDATE coloured row tail not rendered")
 # CSI completeness: every ESC[ sequence must reach a final byte @..~
 # before the next ESC or the end of output.
 i = 0
