@@ -188,6 +188,21 @@ void
 terminal_screen_share_snapshot_free (gchar **lines,
                                      glong rows);
 
+/* termshare: coloured snapshot, same contract as
+ * terminal_screen_get_share_snapshot(), except *lines_out holds
+ * SGR-encoded rows (see terminal-share-colour.h) instead of plain
+ * text.  The colour layer falls back to plain text internally when
+ * neither colour backend produces runs, so the server has a single
+ * code path: call this, send what it returns.  SGR rows contain no
+ * tab or newline, so the wire protocol is unchanged. */
+gboolean
+terminal_screen_get_share_snapshot_coloured (TerminalScreen *screen,
+                                             glong *cols,
+                                             glong *rows,
+                                             glong *cursor_col,
+                                             glong *cursor_row,
+                                             gchar ***lines_out);
+
 const gchar *
 terminal_screen_get_custom_fg_color (TerminalScreen *screen);
 

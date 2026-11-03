@@ -38,6 +38,7 @@ pcre2 = dependency('libpcre2-8', version: dependency_versions['pcre2'])
 libxfce4ui = dependency('libxfce4ui-2', version: dependency_versions['xfce4'])
 libxfce4kbd = dependency('libxfce4kbd-private-3', version: dependency_versions['xfce4'])
 libxfce4util = dependency('libxfce4util-1.0', version: dependency_versions['xfce4'])
+libdl = cc.find_library('dl', required: false)
 xfconf = dependency('libxfconf-0', version: dependency_versions['xfce4'])
 
 # Feature: 'x11'

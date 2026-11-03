@@ -1,0 +1,63 @@
+name: Colour Test
+
+# Tests the termshare colour abstraction layer (terminal-share-colour.c)
+# on both supported VTE generations:
+#   ubuntu-24.04 (VTE 0.76): HTML backend via dlsym
+#   ubuntu-22.04 (VTE 0.68): attributes backend (dlsym fails there)
+# The test program links the actual production colour file, not a copy.
+# Also runs the SGR-aware client truncation test against a mock server.
+# This workflow is NOT the shipping build; the shipping build stays
+# on the Build / Package DEB workflows (ubuntu-24.04).
+
+on:
+  push:
+    branches:
+      - 'termshare/colour'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  colour-impl:
+    name: Colour impl (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libvte-2.91-dev xvfb pkg-config gcc
+      - name: Build colour test
+        run: |
+          cc -Wall -Wextra -o colour_impl_test \
+            spike/colour-html/colour_impl_test.c \
+            terminal/terminal-share-colour.c \
+            -Iterminal \
+            $(pkg-config --cflags --libs gtk+-3.0 vte-2.91)
+      - name: Run colour test under xvfb
+        run: xvfb-run -a ./colour_impl_test
+      - name: Upload colour test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: colour-impl-output-${{ matrix.os }}
+          path: colour_impl_test
+          if-no-files-found: ignore
+
+  client-colour:
+    name: Client SGR truncation (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libvte-2.91-dev libxfce4ui-2-dev libxfce4util-dev libxfconf-0-dev libutempter-dev meson ninja-build pkg-config gcc python3
+      - name: Build termshare-client
+        run: |
+          meson setup build --prefix=/usr --buildtype=release
+          meson compile -C build termshare-client
+      - name: Run mock-server client colour test
+        run: python3 spike/colour-html/mock_colour_client.py build/terminal/termshare-client

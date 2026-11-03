@@ -49,6 +49,7 @@
 #include "terminal-image-loader.h"
 #include "terminal-marshal.h"
 #include "terminal-private.h"
+#include "terminal-share-colour.h"
 #include "terminal-screen.h"
 #include "terminal-util.h"
 #include "terminal-widget.h"
@@ -3308,6 +3309,66 @@ terminal_screen_share_snapshot_free (gchar **lines,
   for (i = 0; i < rows; i++)
     g_free (lines[i]);
   g_free (lines);
+}
+
+
+
+gboolean
+terminal_screen_get_share_snapshot_coloured (TerminalScreen *screen,
+                                             glong *cols,
+                                             glong *rows,
+                                             glong *cursor_col,
+                                             glong *cursor_row,
+                                             gchar ***lines_out)
+{
+  VteTerminal *terminal;
+  glong n_cols, n_rows, col, abs_row, first_visible;
+  GtkAdjustment *adjustment;
+  TerminalShareColourRow *colour_rows = NULL;
+  gchar **lines;
+  glong i;
+
+  g_return_val_if_fail (TERMINAL_IS_SCREEN (screen), FALSE);
+  g_return_val_if_fail (lines_out != NULL, FALSE);
+
+  terminal = VTE_TERMINAL (screen->terminal);
+  if (terminal == NULL)
+    return FALSE;
+
+  n_cols = vte_terminal_get_column_count (terminal);
+  n_rows = vte_terminal_get_row_count (terminal);
+  if (n_cols < 1 || n_rows < 1)
+    return FALSE;
+
+  vte_terminal_get_cursor_position (terminal, &col, &abs_row);
+  first_visible = 0;
+  adjustment = gtk_scrollable_get_vadjustment (GTK_SCROLLABLE (terminal));
+  if (adjustment != NULL)
+    first_visible = (glong) gtk_adjustment_get_value (adjustment);
+  if (first_visible < 0)
+    first_visible = 0;
+  if (first_visible > abs_row)
+    first_visible = abs_row;
+
+  if (!terminal_share_colour_snapshot (terminal, first_visible,
+                                       n_cols, n_rows, &colour_rows))
+    return FALSE;
+
+  lines = g_new0 (gchar *, n_rows);
+  for (i = 0; i < n_rows; i++)
+    lines[i] = terminal_share_colour_row_to_sgr (&colour_rows[i], n_cols);
+  terminal_share_colour_snapshot_free (colour_rows, n_rows);
+
+  *lines_out = lines;
+  if (cols != NULL)
+    *cols = n_cols;
+  if (rows != NULL)
+    *rows = n_rows;
+  if (cursor_col != NULL)
+    *cursor_col = CLAMP (col, 0, n_cols - 1);
+  if (cursor_row != NULL)
+    *cursor_row = CLAMP (abs_row - first_visible, 0, n_rows - 1);
+  return TRUE;
 }
 
 

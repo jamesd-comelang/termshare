@@ -296,7 +296,7 @@ share_server_send_sync (TerminalShareServer *server)
 
   if (!server->client_active || screen == NULL)
     return;
-  if (!terminal_screen_get_share_snapshot (screen, &cols, &rows,
+  if (!terminal_screen_get_share_snapshot_coloured (screen, &cols, &rows,
                                            &cursor_col, &cursor_row,
                                            &lines))
     return;
@@ -316,7 +316,7 @@ share_server_snapshot_timeout_cb (gpointer user_data)
   server->snapshot_timeout_id = 0;
   if (!server->client_active || screen == NULL)
     return FALSE;
-  if (!terminal_screen_get_share_snapshot (screen, &cols, &rows,
+  if (!terminal_screen_get_share_snapshot_coloured (screen, &cols, &rows,
                                            &cursor_col, &cursor_row,
                                            &lines))
     return FALSE;

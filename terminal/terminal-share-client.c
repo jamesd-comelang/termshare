@@ -173,18 +173,51 @@ client_render_row_text (GString *out, glong row, const gchar *text,
                         glong width)
 {
   /* Move to the row, erase it, print text truncated to width
-   * characters (cells are approximated by characters; wide
-   * characters are left to the host terminal, see doc/termshare.md). */
-  gchar *trunc;
+   * visible cells.  Grid rows may now contain SGR sequences
+   * (\e[...m) from the colour layer: those bytes are copied
+   * verbatim, never counted as cells, and never cut in the middle
+   * -- cutting inside an escape sequence, or counting its bytes
+   * as text, would corrupt the row and shift every following cell.
+   * Wide characters count as 2 cells; a wide character that would
+   * straddle the width limit is skipped, not split.  A reset is
+   * always appended, even if the row was truncated, so SGR state
+   * from this row can never leak into the next row. */
+  const gchar *p;
+  glong cells = 0;
+
   g_string_append_printf (out, "\e[%ld;1H\e[K", row + 1);
   if (text == NULL)
     text = "";
-  if ((glong) g_utf8_strlen (text, -1) > width)
-    trunc = g_utf8_substring (text, 0, width);
-  else
-    trunc = g_strdup (text);
-  g_string_append (out, trunc);
-  g_free (trunc);
+  p = text;
+  while (*p != '\0' && cells < width)
+    {
+      if (p[0] == '\e' && p[1] == '[')
+        {
+          /* CSI sequence: copy through its final byte (in the
+           * range @ to ~), regardless of the width limit, so a
+           * trailing reset is never lost.  SGR is the only CSI the
+           * server emits, but copying any CSI this way is safe. */
+          const gchar *q = p + 2;
+          while (*q != '\0' && !(*q >= 0x40 && *q <= 0x7e))
+            q++;
+          if (*q != '\0')
+            q++;
+          g_string_append_len (out, p, q - p);
+          p = q;
+        }
+      else
+        {
+          gunichar ch = g_utf8_get_char (p);
+          const gchar *next = g_utf8_next_char (p);
+          glong w = g_unichar_iswide (ch) ? 2 : 1;
+          if (cells + w > width)
+            break;
+          g_string_append_len (out, p, next - p);
+          cells += w;
+          p = next;
+        }
+    }
+  g_string_append (out, "\e[0m");
 }
 
 static void
