@@ -903,6 +903,9 @@ colour_attributes_snapshot (VteTerminal *terminal,
                             TerminalShareColourRow *out_rows)
 {
   glong i;
+  /* Alt-screen base row, once discovered by scanning (see below).
+   * -1 means unknown yet; the normal-screen base is first_visible. */
+  glong alt_base = -1;
 
   for (i = 0; i < rows; i++)
     {
@@ -910,7 +913,20 @@ colour_attributes_snapshot (VteTerminal *terminal,
       gchar *text;
       TerminalShareColourRun *runs = NULL;
       gsize n_runs = 0;
-      glong abs_row = first_visible + i;
+      glong abs_row = (alt_base >= 0 ? alt_base + i : first_visible + i);
+      gboolean plain_nonempty = FALSE;
+      {
+        const gchar *q = out_rows[i].text;
+        while (q != NULL && *q != '\0')
+          {
+            if (*q != ' ' && *q != '\t')
+              {
+                plain_nonempty = TRUE;
+                break;
+              }
+            q++;
+          }
+      }
 
       attrs = g_array_new (FALSE, FALSE, sizeof (VteCharAttributes));
       /* end_col is exclusive: cols (not cols-1) covers the last
@@ -920,25 +936,60 @@ colour_attributes_snapshot (VteTerminal *terminal,
       text = vte_terminal_get_text_range (terminal, abs_row, 0,
                                           abs_row, cols,
                                           NULL, NULL, attrs);
-      /* Alt screen: the scrollback offset does not apply there, so
-       * first_visible + i can point past the alt screen (NULL) or
-       * at the wrong row (text mismatch).  In that case retry with
-       * the visible row number, which is the alt-screen row.  The
-       * text check is what tells the two cases apart; without it
-       * an alt-screen row would silently render in default colours
-       * on Jammy, while the HTML backend (visible-only full HTML)
-       * renders it correctly on Noble. */
-      if ((text == NULL || attrs->len == 0
-           || !colour_range_text_matches (text, out_rows[i].text))
-          && first_visible != 0)
+      /* Alt screen on VTE 0.68: get_text_range does NOT see the alt
+       * screen at first_visible + i (that returned empty text in
+       * the CI test, even though the visible-only text API returned
+       * the alt row).  A row scan found the alt row at absolute
+       * row 23 for visible row 11 in that test (offset 12, the row
+       * count), so the alt screen lives at some other absolute
+       * base that depends on VTE internals, not on first_visible.
+       * If the first attempt's text does not match the plain line
+       * and the plain line is non-empty, scan absolute rows for
+       * the row whose text matches, and cache its base for the
+       * remaining rows of this snapshot.  The scan is bounded and
+       * only runs on mismatch, so normal-screen snapshots (where
+       * the first attempt always matches) pay nothing for it.
+       * Without this, an alt-screen row would silently render in
+       * default colours on Jammy, while the HTML backend
+       * (visible-only full HTML) renders it correctly on Noble. */
+      if (plain_nonempty
+          && (text == NULL || attrs->len == 0
+              || !colour_range_text_matches (text, out_rows[i].text)))
         {
+          glong cand, scan_limit;
+          gboolean found = FALSE;
           g_free (text);
           g_array_free (attrs, TRUE);
-          attrs = g_array_new (FALSE, FALSE, sizeof (VteCharAttributes));
-          abs_row = i;
-          text = vte_terminal_get_text_range (terminal, abs_row, 0,
-                                              abs_row, cols,
-                                              NULL, NULL, attrs);
+          attrs = NULL;
+          text = NULL;
+          scan_limit = first_visible + rows * 4 + 200;
+          for (cand = 0; cand <= scan_limit && !found; cand++)
+            {
+              GArray *sa = g_array_new (FALSE, FALSE,
+                                        sizeof (VteCharAttributes));
+              gchar *st = vte_terminal_get_text_range (terminal, cand, 0,
+                                                       cand, cols,
+                                                       NULL, NULL, sa);
+              if (st != NULL && sa->len > 0
+                  && colour_range_text_matches (st, out_rows[i].text))
+                {
+                  attrs = sa;
+                  text = st;
+                  alt_base = cand - i;
+                  found = TRUE;
+                }
+              else
+                {
+                  g_free (st);
+                  g_array_free (sa, TRUE);
+                }
+            }
+          if (!found)
+            {
+              attrs = g_array_new (FALSE, FALSE,
+                                   sizeof (VteCharAttributes));
+              text = NULL;
+            }
         }
       if (text == NULL || attrs->len == 0)
         {
