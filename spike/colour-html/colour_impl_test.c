@@ -15,6 +15,7 @@
  * and colour checks must still pass for colours (bold/italic are
  * expected to be absent there, and are checked accordingly).
  */
+#include <dlfcn.h>
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <string.h>
@@ -218,6 +219,58 @@ main (int argc, char **argv)
     }
   backend = terminal_share_colour_backend_name ();
   printf ("backend=%s\n", backend);
+  /* Parser unit check (no terminal needed): if this fails, the
+   * HTML parser itself is broken, independent of what VTE returns. */
+  {
+    gchar *ptext = NULL;
+    TerminalShareColourRun *pruns = NULL;
+    gsize pn = 0;
+    if (terminal_share_colour_parse_html_row (
+            "<font color=\"#C00000\">RED</font> plain",
+            &ptext, &pruns, &pn)
+        && ptext != NULL && strcmp (ptext, "RED plain") == 0
+        && pn >= 1 && pruns[0].fg_set && pruns[0].fg_r == 0xC0
+        && pruns[0].fg_g == 0x00 && pruns[0].fg_b == 0x00)
+      printf ("PASS: HTML parser unit check (font colour)\n");
+    else
+      {
+        printf ("FAIL: HTML parser unit check text=[%s] n=%zu\n",
+                ptext ? ptext : "(null)", pn);
+        failures++;
+      }
+    g_free (ptext);
+    g_free (pruns);
+  }
+  /* Raw HTML diagnostic (test only, not a check): print what VTE
+   * actually returns, so a backend failure can be told apart from
+   * a parser failure in CI logs. */
+  {
+    typedef char *(*FmtFn) (VteTerminal *, int);
+    typedef char *(*RangeFmtFn) (VteTerminal *, int, glong, glong,
+                                 glong, glong, gsize *);
+    FmtFn fmt = (FmtFn) dlsym (RTLD_DEFAULT, "vte_terminal_get_text_format");
+    RangeFmtFn rfmt = (RangeFmtFn) dlsym (
+        RTLD_DEFAULT, "vte_terminal_get_text_range_format");
+    if (fmt != NULL)
+      {
+        char *raw = fmt (term, 1);
+        printf ("--- RAW FULL HTML ---\n%s\n--- END RAW FULL HTML ---\n",
+                raw ? raw : "(NULL)");
+        g_free (raw);
+      }
+    else
+      printf ("--- RAW FULL HTML: dlsym get_text_format failed ---\n");
+    if (rfmt != NULL)
+      {
+        char *raw = rfmt (term, 1, 1, 0, 1, 39, NULL);
+        printf ("--- RAW ROW 1 HTML ---\n%s\n--- END RAW ROW 1 HTML ---\n",
+                raw ? raw : "(NULL)");
+        g_free (raw);
+      }
+    else
+      printf ("--- RAW ROW 1 HTML: dlsym get_text_range_format failed ---\n");
+    fflush (stdout);
+  }
   is_html = strcmp (backend, "html") == 0;
   check (is_html || strcmp (backend, "attributes") == 0,
          "backend is html or attributes (not plain/unknown)");
@@ -406,6 +459,13 @@ main (int argc, char **argv)
     first_visible = adj ? (glong) gtk_adjustment_get_value (adj) : 0;
     if (terminal_share_colour_snapshot (term, first_visible, cols, rows, &snap))
       {
+        glong ai;
+        for (ai = 0; ai < rows; ai++)
+          {
+            char alabel[32];
+            snprintf (alabel, sizeof (alabel), "alt row %ld", ai);
+            print_row (alabel, &snap[ai]);
+          }
         const TerminalShareColourRow *r = find_row_text (snap, rows, "ALTRED");
         check (r != NULL, "alt-screen coloured row visible in snapshot");
         if (r != NULL)

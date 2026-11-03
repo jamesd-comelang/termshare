@@ -878,8 +878,12 @@ colour_attributes_snapshot (VteTerminal *terminal,
       glong abs_row = first_visible + i;
 
       attrs = g_array_new (FALSE, FALSE, sizeof (VteCharAttributes));
+      /* end_col is exclusive: cols (not cols-1) covers the last
+       * cell of a full-width row.  With cols-1 the last cell had
+       * no attribute entry and fell back to default, so a full-width
+       * coloured row rendered its last cell in default colours. */
       text = vte_terminal_get_text_range (terminal, abs_row, 0,
-                                          abs_row, cols - 1,
+                                          abs_row, cols,
                                           NULL, NULL, attrs);
       if (text == NULL || attrs->len == 0)
         {
@@ -1110,7 +1114,7 @@ terminal_share_colour_row_to_sgr (const TerminalShareColourRow *row,
   g_return_val_if_fail (row != NULL, NULL);
   g_return_val_if_fail (row->text != NULL, NULL);
 
-  out = g_string_new ("\e[0m");
+  out = g_string_new (""); /* first run change adds the leading reset */
   p = row->text;
   while (*p != '\0')
     {
