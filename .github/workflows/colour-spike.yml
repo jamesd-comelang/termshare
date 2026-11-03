@@ -1,0 +1,46 @@
+name: Colour Spike
+
+# Spike-only workflow: runs ONLY on the termshare/colour-spike branch.
+# It is not wired into the main Build/Package DEB workflows and must
+# not be merged to master as a permanent workflow without review.
+on:
+  push:
+    branches: [termshare/colour-spike]
+  pull_request:
+    branches: [termshare/colour-spike]
+  workflow_dispatch:
+
+jobs:
+  colour-spike:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libgtk-3-dev \
+            libvte-2.91-dev \
+            xvfb
+
+      - name: Build spike
+        run: |
+          cc -Wall -Wextra -O2 spike/colour-html/colour_spike.c -o colour_spike \
+            $(pkg-config --cflags --libs gtk+-3.0 vte-2.91) -ldl
+          ls -lh colour_spike
+
+      - name: Run spike under xvfb
+        run: |
+          xvfb-run -a ./colour_spike 2>&1 | tee colour_spike_output.txt
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Upload spike output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: colour-spike-output
+          path: colour_spike_output.txt
+          if-no-files-found: error
